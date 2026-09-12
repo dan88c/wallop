@@ -33,19 +33,6 @@ jobs:
           GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/wallop-linux-amd64 ./cmd/harness
           ls -la ../dist
 
-      - name: Commit dist/ into the repo
-        if: github.ref == 'refs/heads/main'
-        run: |
-          git config user.name "wallop-ci"
-          git config user.email "34788707+dan88c@users.noreply.github.com"
-          git add -f dist/wallop-windows-amd64.exe dist/wallop-darwin-arm64 dist/wallop-linux-amd64 dist/README.md
-          if git diff --cached --quiet; then
-            echo "dist unchanged"
-            exit 0
-          fi
-          git commit -m "chore: refresh dist binaries [skip ci]"
-          git push
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -75,8 +62,8 @@ jobs:
           make_latest: false
           body: |
             Rolling binaries from `main`.
-            Also copied into `dist/` in the repo.
-            Copy the file for your OS to `bin/wallop` (Windows: `bin/wallop.exe`).
+            Fetch with `python3 scripts/bootstrap.py --download` (copies into `bin/`).
+            Do not commit these files into `dist/`.
           files: |
             dist/wallop-windows-amd64.exe
             dist/wallop-darwin-arm64

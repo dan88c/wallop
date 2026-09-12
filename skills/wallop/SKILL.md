@@ -36,27 +36,23 @@ If `wallop` is not on PATH, invoke the binary from the repo: `./bin/wallop` on U
 
 ## Binary setup (no Go toolchain)
 
-Never ask the user to install Go. Use pre-built binaries from `dist/` or GitHub Releases.
+Never ask the user to install Go. Do not copy binaries from `dist/` in git; that folder is empty on purpose. Fetch `nightly` from GitHub Releases.
 
 **Linux / macOS**
 
 ```bash
-mkdir -p bin
-cp dist/wallop-linux-amd64 bin/wallop && chmod +x bin/wallop
-# macOS Apple Silicon:
-# cp dist/wallop-darwin-arm64 bin/wallop && chmod +x bin/wallop
+python3 scripts/bootstrap.py --download
 ./bin/wallop toc
-python3 scripts/doctor.py
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-New-Item -ItemType Directory -Force bin | Out-Null
-Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
+py -3 scripts\bootstrap.py --download
 .\bin\wallop.exe toc
-py -3 scripts\doctor.py
 ```
+
+Bootstrap ends with the catalog health table from doctor. That table is the source of truth, not a `DEMO OK` line.
 
 Supported CLI commands: `toc`, `guard`, `graph`, `register`, `doctor`, `version`.
 
@@ -108,14 +104,12 @@ When the user asks to create, list, update, or delete a real calendar event, do 
 
 ## Catalog health (`doctor`)
 
-Run after clone, after `wallop register`, and after the factory.
+Run after clone, after `wallop register`, and after the factory. `scripts/bootstrap.py` already runs doctor and prints the health table.
 
 ```bash
+python3 scripts/bootstrap.py --download
 python3 scripts/doctor.py
-# or
 make doctor
-# or, if the binary is rebuilt
-./bin/wallop doctor
 ```
 
 Checks:

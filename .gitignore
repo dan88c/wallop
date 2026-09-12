@@ -1,6 +1,4 @@
 bin/
-!dist/
-!dist/**
 core-operator/bin/
 .env
 .venv/
@@ -8,8 +6,12 @@ __pycache__/
 *.pyc
 .pytest_cache/
 *.exe
-!dist/*.exe
 .DS_Store
 .coverage
 coverage.xml
 *.egg-info/
+
+# Build products — fetch from GitHub Releases or `make build`
+dist/wallop-*
+!dist/.gitkeep
+!dist/README.md

@@ -4,11 +4,12 @@ PY       ?= python3
 BIN      := bin/wallop
 PREFIX   ?= $(HOME)/.local
 
-.PHONY: help toc validate guard graph register test test-go test-py factory build install tidy sanitize demo bootstrap doctor
+.PHONY: help toc validate guard graph register test test-go test-py factory build install tidy sanitize demo bootstrap doctor download
 
 help:
 	@echo "wallop targets:"
-	@echo "  make build      compile bin/wallop"
+	@echo "  make build      compile bin/wallop (Go required)"
+	@echo "  make download   fetch nightly binary into bin/ (no Go)"
 	@echo "  make toc"
 	@echo "  make guard TOOL=name PAYLOAD='{...}'"
 	@echo "  make graph VAULT=./sandbox/vault QUERY=home"
@@ -17,7 +18,10 @@ help:
 	@echo "  make demo"
 
 bootstrap:
-	$(PY) scripts/bootstrap.py --deps
+	$(PY) scripts/bootstrap.py
+
+download:
+	$(PY) scripts/bootstrap.py --download
 
 build:
 	mkdir -p bin $(GO_DIR)/bin
