@@ -42,6 +42,14 @@ Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
 
 macOS Apple Silicon: copy `dist/wallop-darwin-arm64` instead of the linux binary.
 
+Point the operator at the skill or it will not use Wallop on its own. Paste into Hermes / Ollama / Open WebUI system prompt:
+
+```text
+Read skills/wallop/SKILL.md on startup and on any unknown tool request.
+Run wallop toc before guessing tools. Validate with wallop guard before python tools/<name>.py.
+Exit 3 = ask the human before register or factory.
+```
+
 ## Why Wallop
 
 1. **Context exhaustion.** `wallop toc` is name + tags only. Use `--full` after a guard miss.
@@ -160,6 +168,32 @@ ln -s "$PWD/skills/wallop" "$HOME/.agents/skills/wallop"
 New-Item -ItemType Directory -Force -Path "$HOME\.agents\skills" | Out-Null
 New-Item -ItemType SymbolicLink -Path "$HOME\.agents\skills\wallop" -Target "$PWD\skills\wallop"
 ```
+
+### 6. Instructing your agent
+
+A symlink is not enough. The operator only follows Wallop if the system prompt tells it to load the skill.
+
+Add this to Hermes, Ollama, Open WebUI, or any local agent instructions:
+
+```text
+## Tool governance (wallop)
+
+You have the wallop skill at skills/wallop/SKILL.md
+(or ~/.agents/skills/wallop after the optional symlink).
+
+On startup and on any unknown tool request:
+1. Read skills/wallop/SKILL.md.
+2. Run wallop toc. Do not assume tools exist until they appear there.
+3. Before python tools/<name>.py, run:
+   wallop guard --tool <name> --payload '<json>'
+4. Exit 0 = run the script with the same JSON on stdin.
+   Exit 1 = fix payload, retry at most twice.
+   Exit 3 = stop and ask the human before wallop register or the factory.
+```
+
+Shorter variant:
+
+> Read `skills/wallop/SKILL.md` to learn your tool execution rules. Always run `wallop toc` to discover tools before guessing. Validate parameters with `wallop guard` before running any script. If a tool is missing (exit 3), ask the user before touching the factory.
 
 ## CLI
 
