@@ -35,6 +35,7 @@ def wallop_bin() -> Path:
 
 def main() -> int:
     print("wallop demo (MOCK_MODE=true, no credentials)")
+    print("calendar_gateway is DEMO ONLY — not a live calendar client")
 
     step("1. Information Wall")
     dirty = (
@@ -51,7 +52,7 @@ def main() -> int:
     ops = time_run(TimeOpsReaderInput(week_of="2026-09-09"))
     print(ops.model_dump_json(indent=2))
 
-    step("3. calendar_gateway mock create")
+    step("3. calendar_gateway DEMO mock create (not a real event)")
     tz = ZoneInfo(os.environ["HARNESS_TZ"])
     start = (datetime.now(tz) + timedelta(days=1)).replace(minute=0, second=0, microsecond=0)
     cal = cal_run(
@@ -63,6 +64,7 @@ def main() -> int:
     )
     print(cal.model_dump_json(indent=2))
     assert cal.ok and cal.data.get("mock") is True
+    assert cal.demo is True
 
     step("4. operator TOC + graph (if wallop binary exists)")
     binary = wallop_bin()

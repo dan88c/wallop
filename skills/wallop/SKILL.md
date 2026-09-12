@@ -1,6 +1,6 @@
 ---
 name: wallop
-description: Recommended operator protocol for the wallop toolbox. Use when the user mentions wallop, tool registry, wallop toc, wallop guard, wallop register, information wall, developer factory, calendar_gateway, time_ops_reader, vault graph, or wants an existing script indexed in this repo. Conventions only. Direct Python imports remain allowed. Ask before writing tools/ or modifying the YAML catalog.
+description: Recommended operator protocol for the wallop toolbox. Use when the user mentions wallop, tool registry, wallop toc, wallop guard, wallop register, information wall, developer factory, calendar_gateway (demo-only), time_ops_reader, vault graph, or wants an existing script indexed in this repo. Conventions only. Direct Python imports remain allowed. Ask before writing tools/ or modifying the YAML catalog.
 license: MIT
 metadata:
   version: "1.9"
@@ -11,7 +11,7 @@ metadata:
 
 Recommendations only. Working directory must be the repo root. Set `WALLOP_ROOT` if the CLI cannot walk up to `config/tool_registry.yaml`. Adapt path separators and piping to the host OS (Bash vs PowerShell).
 
-If `wallop` is not on PATH, invoke the binary from the repo: `./bin/wallop` on Unix, `.\bin\wallop.exe` on Windows. Do not assume the bare command `wallop` exists.
+If `wallop` is not on PATH, invoke the binary from the repo: `./bin/wallop` on Unix, `.\\bin\\wallop.exe` on Windows. Do not assume the bare command `wallop` exists.
 
 ## Binary setup (no Go toolchain)
 
@@ -75,7 +75,9 @@ echo '{"param":"value"}' | python tools/TOOL_NAME.py
 | 3 | Unknown tool | Stop. Ask: (A) register an existing script, (B) generate via factory, or (C) abort |
 | 4 | Bad JSON | Reserialize a valid flat JSON object |
 
-Default catalog names: `calendar_gateway`, `time_ops_reader`.
+Default catalog names: `calendar_gateway` (**demo-only**, not a live calendar client), `time_ops_reader`.
+
+When the user asks to create, list, update, or delete a real calendar event, do **not** treat `calendar_gateway` as production. Say it is a harness sample. Real writes belong on an edge webhook outside this repo.
 
 ## Expanding the catalog (ask before writing)
 
@@ -85,7 +87,7 @@ When exit code is 3 or the user already has a script:
 2. Ask: "Tool not found. Register an existing script, generate a new one via the factory, or abort?"
 3. If they choose register:
 
-Use `.\bin\wallop.exe` on Windows if `bin` is not on PATH.
+Use `.\\bin\\wallop.exe` on Windows if `bin` is not on PATH.
 
 ```bash
 ./bin/wallop register --entry ./path/to/script.py --name my_tool --desc "Short description" --tag custom --risk read
@@ -121,4 +123,4 @@ python developer-factory/factory_agent.py --brief "Abstract functional requireme
 ```
 
 3. The factory runs local pytest. Only passing tools are registered.
-4. Verify with `./bin/wallop toc` (Windows: `.\bin\wallop.exe toc`).
+4. Verify with `./bin/wallop toc` (Windows: `.\\bin\\wallop.exe toc`).

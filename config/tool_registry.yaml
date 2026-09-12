@@ -7,8 +7,8 @@ timezone: Asia/Hong_Kong
 
 tools:
   - name: calendar_gateway
-    desc: Call the edge calendar webhook. Never ships OAuth tokens.
-    tags: [calendar, write, edge, webhook]
+    desc: "DEMO ONLY. Sample harness tool (mock calendar webhook). Not a live calendar client."
+    tags: [demo, calendar, write, edge, webhook]
     entry: tools/calendar_gateway.py
     risk: write
     params:

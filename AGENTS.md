@@ -2,7 +2,9 @@
 
 Wallop is a local toolbox plus optional CLI. You already have a model loop.
 
-Load `skills/wallop/SKILL.md` for calendar, vault-graph, registry, factory, `wallop register`, or "put my existing script in this repo" requests.
+Load `skills/wallop/SKILL.md` for vault-graph, registry, factory, `wallop register`, or "put my existing script in this repo" requests.
+
+`calendar_gateway` is **demo-only**. It exists so bootstrap/tests can exercise the pipe. Do not treat it as a real calendar client; do not point it at a production webhook unless the user explicitly asks for a demo against their edge.
 
 Recommended conventions
 
