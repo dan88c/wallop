@@ -4,10 +4,13 @@ description: Recommended operator protocol for the wallop toolbox. Load this ski
 license: MIT
 metadata:
   version: "1.11"
+  release: "1.0.001"
   repo: dan88c/wallop
 ---
 
 # wallop operator skill
+
+Project release: **1.0.001** (`VERSION`). Skill protocol version: 1.11.
 
 This skill lets an agent discover, validate, and run local tools without stuffing full JSON schemas into the prompt.
 
@@ -55,7 +58,7 @@ Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
 py -3 scripts\doctor.py
 ```
 
-Supported CLI commands: `toc`, `guard`, `graph`, `register`, `doctor`.
+Supported CLI commands: `toc`, `guard`, `graph`, `register`, `doctor`, `version`.
 
 `wallop doctor` shells out to `scripts/doctor.py`. If the binary is stale, run the Python script directly.
 
