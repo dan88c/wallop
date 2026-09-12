@@ -13,9 +13,10 @@ import importlib.util
 import json
 import os
 import sys
+import typing
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import BaseModel
@@ -56,6 +57,10 @@ def import_tool(entry: Path, name: str) -> Any:
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load {entry}")
     mod = importlib.util.module_from_spec(spec)
+    # Future annotations leave Literal unresolved under spec_from_file_location.
+    mod.__dict__.setdefault("Literal", Literal)
+    mod.__dict__.setdefault("Any", Any)
+    mod.__dict__.setdefault("typing", typing)
     spec.loader.exec_module(mod)
     return mod
 
@@ -75,7 +80,17 @@ def json_type(schema_prop: dict[str, Any]) -> str:
     if "anyOf" in schema_prop:
         types = [p.get("type") for p in schema_prop["anyOf"] if p.get("type") and p.get("type") != "null"]
         return types[0] if types else "string"
+    if "enum" in schema_prop:
+        return "string"
     return str(schema_prop.get("type") or "string")
+
+
+def schema_for(model: type[BaseModel]) -> dict[str, Any]:
+    try:
+        model.model_rebuild(_types_namespace={"Literal": Literal, "Any": Any, "typing": typing})
+    except Exception:
+        pass
+    return model.model_json_schema()
 
 
 def check_duplicates(tools: list[dict[str, Any]]) -> list[str]:
@@ -99,7 +114,10 @@ def check_tool(root: Path, tool: dict[str, Any]) -> tuple[list[str], list[str]]:
     model = input_model(mod)
     if model is None:
         return [f"{name}: no pydantic *Input BaseModel in {entry_rel}"], warns
-    schema = model.model_json_schema()
+    try:
+        schema = schema_for(model)
+    except Exception as exc:  # noqa: BLE001
+        return [f"{name}: model_json_schema() failed: {exc}"], warns
     props: dict[str, Any] = schema.get("properties") or {}
     required = set(schema.get("required") or [])
     yaml_params = tool.get("params") or []
