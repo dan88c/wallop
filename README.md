@@ -24,6 +24,7 @@ No API key. Ends with `DEMO OK` (Python still succeeds if Go is missing).
 ```bash
 git clone https://github.com/dan88c/wallop.git && cd wallop
 python3 scripts/bootstrap.py
+python3 scripts/doctor.py
 ```
 
 Windows:
@@ -31,6 +32,7 @@ Windows:
 ```powershell
 git clone https://github.com/dan88c/wallop.git; cd wallop
 py -3 scripts\bootstrap.py
+py -3 scripts\doctor.py
 ```
 
 Then list the catalog (prebuilt binary, no Go toolchain):
@@ -61,6 +63,7 @@ Point the operator at the skill or it will not use Wallop on its own. Paste into
 Read skills/wallop/SKILL.md on startup and on any unknown tool request.
 Run wallop toc before guessing tools. Validate with wallop guard before python tools/<name>.py.
 Exit 3 = ask the human before register or factory.
+After register or factory, run wallop doctor (or python scripts/doctor.py).
 ```
 
 ## Why Wallop
@@ -74,7 +77,7 @@ Exit 3 = ask the human before register or factory.
 | Host | Windows / Linux / macOS | Cloud API or a second local host |
 | Model | Local 14B–36B | Stronger model, or offline mock |
 | Runtime | Static `wallop` binary, or direct Python | Python 3.11+ factory |
-| Job | TOC, guard, graph, register | Propose Pydantic tools + pytest |
+| Job | TOC, guard, graph, register, doctor | Propose Pydantic tools + pytest |
 | Cost | $0 for routine calls | One call on a gap |
 
 ## Architecture
@@ -94,6 +97,7 @@ flowchart TD
         GoGuard -->|Exit 3 unknown tool| AskUser[Ask user: register existing tool or run factory]
         AskUser --> Register[wallop register]
         AskUser --> Wall[Information Wall privacy_guard.py]
+        Register --> Doctor[wallop doctor]
     end
     subgraph External_Cloud[External Boundary]
         Wall -->|Sanitized intent spec only| CloudDev[Developer: Cloud API / Mock]
@@ -103,6 +107,7 @@ flowchart TD
         Register --> Catalog[tools/ + config/tool_registry.yaml]
         Factory --> Catalog
         Catalog -.-> GoTOC
+        Catalog --> Doctor
     end
 ```
 
@@ -121,13 +126,15 @@ cd wallop
 
 ```powershell
 py -3 scripts\bootstrap.py
+py -3 scripts\doctor.py
 ```
 
 ```bash
 python3 scripts/bootstrap.py
+python3 scripts/doctor.py
 ```
 
-Ends with `DEMO OK`. Python still succeeds if Go is missing.
+Ends with `DEMO OK`. Python still succeeds if Go is missing. Doctor exits 0 when the catalog, tool schemas, timezone, and vault path are healthy.
 
 ### 3. Operator CLI (no Go required)
 
@@ -168,7 +175,7 @@ New-Item -ItemType Directory -Force bin | Out-Null
 go build -C core-operator -o ..\bin\wallop.exe .\cmd\harness
 ```
 
-Then `.\bin\wallop.exe toc` or `./bin/wallop toc`.
+Then `.\bin\wallop.exe toc` or `./bin/wallop toc`. Rebuild before `wallop doctor` if you want the Go wrapper; `python3 scripts/doctor.py` always works.
 
 ### 5. Optional skill symlink
 
@@ -179,7 +186,7 @@ ln -s "$PWD/skills/wallop" "$HOME/.agents/skills/wallop"
 
 ```powershell
 New-Item -ItemType Directory -Force -Path "$HOME\.agents\skills" | Out-Null
-New-Item -ItemType SymbolicLink -Path "$HOME\.agents\skills\wallop" -Target "$PWD\skills\wallop"
+New-Item -Type SymbolicLink -Path "$HOME\.agents\skills\wallop" -Target "$PWD\skills\wallop"
 ```
 
 ### 6. Instructing your agent
@@ -202,11 +209,12 @@ On startup and on any unknown tool request:
 4. Exit 0 = run the script with the same JSON on stdin.
    Exit 1 = fix payload, retry at most twice.
    Exit 3 = stop and ask the human before wallop register or the factory.
+5. After register or factory, run python scripts/doctor.py (or wallop doctor).
 ```
 
 Shorter variant:
 
-> Read `skills/wallop/SKILL.md` to learn your tool execution rules. Always run `wallop toc` to discover tools before guessing. Validate parameters with `wallop guard` before running any script. If a tool is missing (exit 3), ask the user before touching the factory.
+> Read `skills/wallop/SKILL.md` to learn your tool execution rules. Always run `wallop toc` to discover tools before guessing. Validate parameters with `wallop guard` before running any script. If a tool is missing (exit 3), ask the user before touching the factory. After any catalog write, run `wallop doctor`.
 
 ## CLI
 
@@ -216,19 +224,38 @@ wallop toc --full
 wallop guard --tool calendar_gateway --payload '{"action":"list"}'
 wallop graph --vault ./sandbox/vault --query home
 wallop register --entry ./path/to/script.py --name my_counter --desc "Count words" --tag text --param text:string:required
+wallop doctor
+python3 scripts/doctor.py
 ```
 
 `calendar_gateway` in the example above is the demo tool (tag `demo`).
 
 | Exit | Meaning | Suggested action |
 |------|---------|------------------|
-| 0 | Payload accepted | Run `tools/<name>.py` |
-| 1 | Invalid call | Fix and retry at most twice |
+| 0 | Payload accepted / doctor healthy | Run `tools/<name>.py`, or keep going |
+| 1 | Invalid call / doctor errors | Fix payload or catalog; retry guard at most twice |
 | 2 | Usage | Fix flags |
 | 3 | Unknown tool | Ask: `wallop register` or factory |
 | 4 | Bad JSON | Reserialize a flat object |
 
 `wallop` walks up from cwd (or uses `WALLOP_ROOT`) to find `config/tool_registry.yaml`.
+
+## Catalog health
+
+Every new tool is a landmine unless the YAML name, the Python `*Input` schema, and the host paths still agree.
+
+```bash
+python3 scripts/doctor.py
+make doctor
+```
+
+Doctor checks:
+
+1. No duplicate `name` in `config/tool_registry.yaml`.
+2. Each `tools/<name>.py` imports, and `BaseModel.model_json_schema()` on its `*Input` model matches YAML param names, types, and required flags.
+3. `HARNESS_TZ` is a usable IANA zone (default `Asia/Hong_Kong`) and `VAULT_PATH` exists (default `./sandbox/vault`).
+
+Exit 0 with warnings is fine. The current demo catalog warns that `calendar_gateway` has an `extra` Pydantic field not listed in YAML. Exit 1 means fix the catalog before adding another tool.
 
 ## Bring your own tools
 
@@ -236,6 +263,7 @@ Ask first, then:
 
 ```bash
 wallop register --entry ./path/to/script.py --name my_counter --desc "Count words" --tag text --param text:string:required --risk read
+python3 scripts/doctor.py
 ```
 
 Copies to `tools/my_counter.py` and upserts the YAML unless `--keep-path` is set. Then `wallop toc` lists the new name.
@@ -253,6 +281,7 @@ The factory is only for generating a *new* stub when no ready file exists.
 ```bash
 # Offline / demo (default)
 python developer-factory/factory_agent.py --name wiki_search --desc "Keyword search over a vault" --tag read --param query:string:required
+python3 scripts/doctor.py
 
 # Live Developer model — only after URL + token are set
 # MOCK_MODE=false
@@ -285,8 +314,8 @@ output: {"intent": "calendar_check", "entities": []}
 |----------|---------|------|
 | `MOCK_MODE` | `true` | No sockets |
 | `EDGE_CALENDAR_WEBHOOK` | `http://127.0.0.1:8088/webhook/calendar` | Demo edge URL only |
-| `VAULT_PATH` | `./sandbox/vault` | `wallop graph` |
-| `HARNESS_TZ` | `Asia/Hong_Kong` | Past-date boundary |
+| `VAULT_PATH` | `./sandbox/vault` | `wallop graph` and doctor |
+| `HARNESS_TZ` | `Asia/Hong_Kong` | Past-date boundary and doctor |
 | `TIME_OPS_LOG_PATH` | `./data/time_ops.log` | Time-ops log |
 | `CLOUD_DEVELOPER_URL` | unset | Live factory proposer |
 | `CLOUD_DEVELOPER_TOKEN` | unset | Optional bearer for that URL |
@@ -303,7 +332,8 @@ output: {"intent": "calendar_check", "entities": []}
 ├── dist/                   # committed platform binaries
 ├── tools/                  # calendar_gateway.py is demo-only
 ├── skills/wallop/SKILL.md
-└── scripts/bootstrap.py
+├── scripts/bootstrap.py
+└── scripts/doctor.py       # catalog health check
 ```
 
 ## Makefile
@@ -314,6 +344,7 @@ make build
 make test-py
 make test-go
 make toc
+make doctor
 make guard TOOL=calendar_gateway PAYLOAD='{"action":"list"}'
 make graph VAULT=./sandbox/vault QUERY=home
 make register ENTRY=./script.py NAME=my_counter
@@ -334,6 +365,6 @@ make factory ARGS='--name wiki_search --desc "Keyword search over a vault" --tag
      | () || () |       typed Go shell and information wall
       \\__/  \\__/        mascot: mantis shrimp
        /______\\
-     /|  \\__/  |\\       shell = TOC compression, guard, register
+     /|  \\__/  |\\       shell = TOC compression, guard, register, doctor
     |_|  /  \\  |_|      punch = less prompt bloat, no vendor lock-in
 ```
