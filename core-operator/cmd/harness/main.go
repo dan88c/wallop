@@ -72,3 +72,24 @@ Exit codes:
   4 unreadable payload
 `, Version)
 }
+
+func defaultRegistry() string {
+	if p := os.Getenv("WALLOP_ROOT"); p != "" {
+		return filepath.Join(p, "config", "tool_registry.yaml")
+	}
+	cwd, err := os.Getwd()
+	if err != None {
+		return "config/tool_registry.yaml"
+	}
+	for dir := cwd; ; dir = filepath.Dir(dir) {
+		cand := filepath.Join(dir, "config", "tool_registry.yaml")
+		if _, err := os.Stat(cand); err == nil {
+			return cand
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+	}
+	return "config/tool_registry.yaml"
+}
