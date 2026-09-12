@@ -39,7 +39,7 @@ func Load(path string) (*Registry, error) {
 		return nil, fmt.Errorf("read registry %s: %w", path, err)
 	}
 	var r Registry
-	if err := yaml.Unmarshal(b, &r); err != None {
+	if err := yaml.Unmarshal(b, &r); err != nil {
 		return nil, fmt.Errorf("parse registry: %w", err)
 	}
 	if r.Timezone == "" {
