@@ -19,35 +19,23 @@ The catalog is not limited to factory-generated tools. Any standalone Pydantic s
 
 ### 30-second quickstart
 
-No API key. Ends with `DEMO OK` (Python still succeeds if Go is missing).
+No API key. No committed binaries. One command installs deps, runs the demo, places `bin/wallop`, then prints the catalog health table. That table is the source of truth — bootstrap does not print `DEMO OK`.
 
 ```bash
 git clone https://github.com/dan88c/wallop.git && cd wallop
-python3 scripts/bootstrap.py
-python3 scripts/doctor.py
+python3 scripts/bootstrap.py --download
+./bin/wallop toc
 ```
 
 Windows:
 
 ```powershell
 git clone https://github.com/dan88c/wallop.git; cd wallop
-py -3 scripts\bootstrap.py
-py -3 scripts\doctor.py
-```
-
-Then list the catalog (prebuilt binary, no Go toolchain):
-
-```bash
-mkdir -p bin && cp dist/wallop-linux-amd64 bin/wallop && chmod +x bin/wallop && ./bin/wallop toc
-```
-
-```powershell
-New-Item -ItemType Directory -Force bin | Out-Null
-Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
+py -3 scripts\bootstrap.py --download
 .\bin\wallop.exe toc
 ```
 
-macOS Apple Silicon: copy `dist/wallop-darwin-arm64` instead of the linux binary.
+`--download` pulls the matching `nightly` asset from [GitHub Releases](https://github.com/dan88c/wallop/releases) into `bin/` and sets execute bits on Unix. If Go is on PATH, bootstrap compiles instead. A leftover local `dist/wallop-*` is used only when `--download` is omitted and that file exists.
 
 Information Wall (titles never leave the machine):
 
@@ -122,42 +110,67 @@ git clone https://github.com/dan88c/wallop.git
 cd wallop
 ```
 
-### 2. Bootstrap and demo
-
-```powershell
-py -3 scripts\bootstrap.py
-py -3 scripts\doctor.py
-```
+### 2. Bootstrap
 
 ```bash
-python3 scripts/bootstrap.py
-python3 scripts/doctor.py
+python3 scripts/bootstrap.py --download
 ```
 
-Ends with `DEMO OK`. Python still succeeds if Go is missing. Doctor exits 0 when the catalog, tool schemas, timezone, and vault path are healthy.
+```powershell
+py -3 scripts\bootstrap.py --download
+```
+
+What bootstrap does:
+
+1. Creates `.venv` and installs `developer-factory/requirements.txt`.
+2. Places `bin/wallop`:
+   - Go on PATH → `go build` into `bin/`.
+   - Else if a local `dist/wallop-*` exists (CI leftover) → copy to `bin/wallop` and `chmod +x`.
+   - Else → download `nightly` (or `WALLOP_RELEASE`) from GitHub Releases into `bin/`.
+3. Runs tests and the demo when you do not pass a narrower flag.
+4. Runs `scripts/doctor.py` and prints the catalog health table. That table is the source of truth.
+
+Example finish line:
+
+```text
+Catalog health
+  doctor        exit 0 (healthy)
+  tools         2
+  errors        0
+  warnings      3
+  go            missing
+  binary        bin/wallop <- release nightly/wallop-linux-amd64
+
+Doctor exits 0 when the catalog, tool schemas, timezone, and vault path are healthy.
+```
+
+`make download` is the same as `--download`.
 
 ### 3. Operator CLI (no Go required)
 
-Platform binaries live in `dist/` in this repo and on GitHub Releases (`nightly` plus `v*` tags).
+Binaries are **not** stored in git. `dist/` holds `.gitkeep` only. Fetch from Releases:
 
 ```bash
-mkdir -p bin
-cp dist/wallop-linux-amd64 bin/wallop && chmod +x bin/wallop   # Linux amd64
-# cp dist/wallop-darwin-arm64 bin/wallop && chmod +x bin/wallop  # macOS Apple Silicon
+python3 scripts/bootstrap.py --download
 ./bin/wallop toc
 ```
 
-Windows PowerShell:
-
 ```powershell
-New-Item -ItemType Directory -Force bin | Out-Null
-Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
+py -3 scripts\bootstrap.py --download
 .\bin\wallop.exe toc
 ```
 
+Platform map used by bootstrap (`platform.system()` + `platform.machine()`):
+
+| Host | Release asset | Dest |
+|------|---------------|------|
+| Linux x86_64 | `wallop-linux-amd64` | `bin/wallop` |
+| macOS arm64 | `wallop-darwin-arm64` | `bin/wallop` |
+| Windows amd64 | `wallop-windows-amd64.exe` | `bin/wallop.exe` |
+
 ### 4. Building from source (Go 1.22+ required)
 
-Use this if you prefer compiling instead of `dist/` or a Release. GNU Make is optional. The Go module lives in `core-operator/`, so the `-C` form below works from the repo root without Make.
+Use this if you prefer compiling instead of a Release. GNU Make is optional. The Go module lives in `core-operator/`.
 
 **macOS / Linux**
 
@@ -175,7 +188,7 @@ New-Item -ItemType Directory -Force bin | Out-Null
 go build -C core-operator -o ..\bin\wallop.exe .\cmd\harness
 ```
 
-Then `.\bin\wallop.exe toc` or `./bin/wallop toc`. Rebuild before `wallop doctor` if you want the Go wrapper; `python3 scripts/doctor.py` always works.
+Then `.\bin\wallop.exe toc` or `./bin/wallop toc`.
 
 ### 5. Optional skill symlink
 
@@ -242,7 +255,7 @@ python3 scripts/doctor.py
 
 ## Catalog health
 
-Every new tool is a landmine unless the YAML name, the Python `*Input` schema, and the host paths still agree.
+Every new tool is a landmine unless the YAML name, the Python `*Input` schema, and the host paths still agree. Bootstrap already runs doctor. You can also run it alone:
 
 ```bash
 python3 scripts/doctor.py
@@ -256,6 +269,8 @@ Doctor checks:
 3. `HARNESS_TZ` is a usable IANA zone (default `Asia/Hong_Kong`) and `VAULT_PATH` exists (default `./sandbox/vault`).
 
 Exit 0 with warnings is fine. The current demo catalog warns that `calendar_gateway` has an `extra` Pydantic field not listed in YAML. Exit 1 means fix the catalog before adding another tool.
+
+Token cost of `wallop toc` vs `wallop toc --full` is pending a later measurement. No placeholder figures here.
 
 ## Bring your own tools
 
@@ -320,6 +335,7 @@ output: {"intent": "calendar_check", "entities": []}
 | `CLOUD_DEVELOPER_URL` | unset | Live factory proposer |
 | `CLOUD_DEVELOPER_TOKEN` | unset | Optional bearer for that URL |
 | `WALLOP_ROOT` | inferred | Repo root |
+| `WALLOP_RELEASE` | `nightly` | Release tag used by `--download` |
 
 ## Layout
 
@@ -329,10 +345,10 @@ output: {"intent": "calendar_check", "entities": []}
 ├── config/tool_registry.yaml
 ├── core-operator/
 ├── developer-factory/
-├── dist/                   # committed platform binaries
+├── dist/                   # .gitkeep only; binaries come from Releases or make build
 ├── tools/                  # calendar_gateway.py is demo-only
 ├── skills/wallop/SKILL.md
-├── scripts/bootstrap.py
+├── scripts/bootstrap.py    # --download + doctor status table
 └── scripts/doctor.py       # catalog health check
 ```
 
@@ -340,7 +356,8 @@ output: {"intent": "calendar_check", "entities": []}
 
 ```bash
 make demo
-make build
+make build          # Go required; writes bin/wallop
+make download       # no Go; GitHub Releases -> bin/
 make test-py
 make test-go
 make toc
