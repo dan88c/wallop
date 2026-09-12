@@ -1,17 +1,34 @@
 ---
 name: wallop
-description: Recommended operator protocol for the wallop toolbox. Use when the user mentions wallop, tool registry, wallop toc, wallop guard, wallop register, information wall, developer factory, calendar_gateway (demo-only), time_ops_reader, vault graph, or wants an existing script indexed in this repo. Conventions only. Direct Python imports remain allowed. Ask before writing tools/ or modifying the YAML catalog.
+description: Recommended operator protocol for the wallop toolbox. Load this skill on startup and whenever the user mentions wallop, tool registry, wallop toc, wallop guard, wallop register, information wall, developer factory, calendar_gateway (demo-only), time_ops_reader, vault graph, an unknown tool, or wants an existing script indexed in this repo. Conventions only. Direct Python imports remain allowed. Ask before writing tools/ or modifying the YAML catalog.
 license: MIT
 metadata:
-  version: "1.9"
+  version: "1.10"
   repo: dan88c/wallop
 ---
 
 # wallop operator skill
 
+This skill lets an agent discover, validate, and run local tools without stuffing full JSON schemas into the prompt.
+
+**Trigger.** Load this file on session start, when the working directory is a wallop checkout, when the user names a wallop command, or when a requested capability is not in the last `wallop toc` output.
+
 Recommendations only. Working directory must be the repo root. Set `WALLOP_ROOT` if the CLI cannot walk up to `config/tool_registry.yaml`. Adapt path separators and piping to the host OS (Bash vs PowerShell).
 
 If `wallop` is not on PATH, invoke the binary from the repo: `./bin/wallop` on Unix, `.\\bin\\wallop.exe` on Windows. Do not assume the bare command `wallop` exists.
+
+## Core directives
+
+1. Read this skill, then run `wallop toc`. Do not assume any tool exists until it appears in the TOC.
+2. When the user asks for an action, match it against TOC names. Use `wallop toc --full` only after a guard miss.
+3. Validate before run: `wallop guard --tool <name> --payload '<json>'`.
+   - Exit 0: safe to run `python tools/<name>.py` with the same JSON on stdin.
+   - Exit 1: validation failed. Read stderr, fix arguments, retry at most twice.
+   - Exit 2: bad flags.
+   - Exit 3: unknown tool. Stop. Ask: "No tool found. Register an existing script, run the developer factory, or abort?"
+   - Exit 4: reserialize a flat JSON object.
+4. Never invent tool names. Never write `tools/` or `config/tool_registry.yaml` without a yes.
+5. `calendar_gateway` is demo-only, not a live calendar client.
 
 ## Binary setup (no Go toolchain)
 
