@@ -304,10 +304,10 @@ make factory ARGS='--name wiki_search --desc "Keyword search over a vault" --tag
 
 ```text
        __    __
-      /  \\  /  \\        WALLOP (`wallop`)
+      /  \  /  \        WALLOP (`wallop`)
      | () || () |       typed Go shell and information wall
-      \\__/  \\__/        mascot: mantis shrimp
-       /______\\
-     /|  \\__/  |\\       shell = TOC compression, guard, register
-    |_|  /  \\  |_|      punch = less prompt bloat, no vendor lock-in
+      \__/  \__/        mascot: mantis shrimp
+       /______\
+     /|  \__/  |\       shell = TOC compression, guard, register
+    |_|  /  \  |_|      punch = less prompt bloat, no vendor lock-in
 ```
