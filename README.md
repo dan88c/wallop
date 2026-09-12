@@ -12,6 +12,36 @@ The catalog is not limited to factory-generated tools. Any standalone Pydantic s
 
 **Who it is not for.** Turnkey multi-agent products (CrewAI, Dify, AutoGen), hosted browsing agents, or visual workflow canvases.
 
+### 30-second quickstart
+
+No API key. Ends with `DEMO OK` (Python still succeeds if Go is missing).
+
+```bash
+git clone https://github.com/dan88c/wallop.git && cd wallop
+python3 scripts/bootstrap.py
+```
+
+Windows:
+
+```powershell
+git clone https://github.com/dan88c/wallop.git; cd wallop
+py -3 scripts\bootstrap.py
+```
+
+Then list the catalog (prebuilt binary, no Go toolchain):
+
+```bash
+mkdir -p bin && cp dist/wallop-linux-amd64 bin/wallop && chmod +x bin/wallop && ./bin/wallop toc
+```
+
+```powershell
+New-Item -ItemType Directory -Force bin | Out-Null
+Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
+.\bin\wallop.exe toc
+```
+
+macOS Apple Silicon: copy `dist/wallop-darwin-arm64` instead of the linux binary.
+
 ## Why Wallop
 
 1. **Context exhaustion.** `wallop toc` is name + tags only. Use `--full` after a guard miss.
