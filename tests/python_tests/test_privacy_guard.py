@@ -32,17 +32,19 @@ def test_blocks_oauth_hint():
 
 
 def test_calendar_title_becomes_intent_only():
-    raw = {"title": "跟老闇去醫院"}
+    raw = {"title": "go to the hospital with the boss"}
     out = sanitize_payload(raw)
     assert out.ok
     assert out.cloud_spec() == {"intent": "calendar_check", "entities": []}
     leaked = out.cloud_payload() + str(out.cloud_spec())
-    assert "老闇" not in leaked
-    assert "醫院" not in leaked
+    assert "hospital" not in leaked.lower()
+    assert "boss" not in leaked.lower()
     assert "title" not in out.cloud_spec()
 
 
 def test_sanitize_parses_json_string_title():
-    out = sanitize('{"title": "跟老闇去醫院"}')
+    out = sanitize('{"title": "go to the hospital with the boss"}')
     assert out.cloud_spec() == {"intent": "calendar_check", "entities": []}
-    assert "老闇" not in out.cloud_payload()
+    payload = out.cloud_payload().lower()
+    assert "hospital" not in payload
+    assert "boss" not in payload
