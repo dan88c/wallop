@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "developer-factory"))
-from privacy_guard import sanitize  # noqa: E402
+from privacy_guard import sanitize, sanitize_payload  # noqa: E402
 
 
 def test_strips_email_and_token():
@@ -29,3 +29,20 @@ def test_blocks_oauth_hint():
         raise AssertionError("should have blocked")
     except PermissionError:
         pass
+
+
+def test_calendar_title_becomes_intent_only():
+    raw = {"title": "跟老闇去醫院"}
+    out = sanitize_payload(raw)
+    assert out.ok
+    assert out.cloud_spec() == {"intent": "calendar_check", "entities": []}
+    leaked = out.cloud_payload() + str(out.cloud_spec())
+    assert "老闇" not in leaked
+    assert "醫院" not in leaked
+    assert "title" not in out.cloud_spec()
+
+
+def test_sanitize_parses_json_string_title():
+    out = sanitize('{"title": "跟老闇去醫院"}')
+    assert out.cloud_spec() == {"intent": "calendar_check", "entities": []}
+    assert "老闇" not in out.cloud_payload()

@@ -8,8 +8,10 @@ requirement.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 _SECRET = re.compile(
     r"(?i)\b(api[_-]?key|secret|token|password|passwd|bearer|authorization)\b"
@@ -33,6 +35,9 @@ _BLOCK_HINTS = (
     "client_secret",
 )
 
+_CALENDAR_KEYS = {"title", "start", "end", "event_id", "action", "attendees"}
+_WRITE_ACTIONS = {"create", "update", "delete", "write", "set"}
+
 
 @dataclass
 class SanitizeResult:
@@ -41,16 +46,28 @@ class SanitizeResult:
     redactions: list[str] = field(default_factory=list)
     blocked: bool = False
     reason: str | None = None
+    spec: dict[str, Any] | None = None
 
     def cloud_payload(self) -> str:
         if self.blocked:
             raise PermissionError(self.reason or "blocked by information wall")
         return self.abstract
 
+    def cloud_spec(self) -> dict[str, Any]:
+        if self.blocked:
+            raise PermissionError(self.reason or "blocked by information wall")
+        if self.spec is not None:
+            return self.spec
+        return {"intent": "generic_requirement", "entities": [], "abstract": self.abstract}
+
 
 def sanitize(task: str, *, allow_examples: bool = True) -> SanitizeResult:
     if not task or not task.strip():
         return SanitizeResult(ok=False, abstract="", blocked=True, reason="empty task")
+
+    parsed = _try_json_object(task)
+    if parsed is not None:
+        return sanitize_payload(parsed)
 
     lower = task.lower()
     redactions: list[str] = []
@@ -84,6 +101,44 @@ def sanitize(task: str, *, allow_examples: bool = True) -> SanitizeResult:
 
     abstract = _to_abstract(text, allow_examples=allow_examples)
     return SanitizeResult(ok=True, abstract=abstract, redactions=redactions, blocked=False)
+
+
+def sanitize_payload(payload: dict[str, Any]) -> SanitizeResult:
+    """Drop private field values. Cloud sees intent only, never titles or names."""
+    keys = {str(k).lower() for k in payload}
+    redactions: list[str] = []
+    if payload.get("title") not in (None, ""):
+        redactions.append("title:1")
+    for key in ("start", "end", "event_id", "attendees", "notes", "note", "summary"):
+        if payload.get(key) not in (None, "", [], {}):
+            redactions.append(f"{key}:1")
+
+    action = str(payload.get("action") or "").lower()
+    if keys & _CALENDAR_KEYS:
+        intent = "calendar_write" if action in _WRITE_ACTIONS else "calendar_check"
+    else:
+        intent = "generic_requirement"
+
+    spec = {"intent": intent, "entities": []}
+    abstract = _to_abstract(json.dumps(spec, ensure_ascii=False), allow_examples=False)
+    return SanitizeResult(
+        ok=True,
+        abstract=abstract,
+        redactions=redactions,
+        blocked=False,
+        spec=spec,
+    )
+
+
+def _try_json_object(task: str) -> dict[str, Any] | None:
+    raw = task.strip()
+    if not raw.startswith("{") or not raw.endswith("}"):
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _to_abstract(text: str, *, allow_examples: bool) -> str:
