@@ -1,9 +1,9 @@
 ---
 name: wallop
-description: Recommended operator protocol for the wallop toolbox. Load this skill on startup and whenever the user mentions wallop, tool registry, wallop toc, wallop guard, wallop register, information wall, developer factory, calendar_gateway (demo-only), time_ops_reader, vault graph, an unknown tool, or wants an existing script indexed in this repo. Conventions only. Direct Python imports remain allowed. Ask before writing tools/ or modifying the YAML catalog.
+description: Recommended operator protocol for the wallop toolbox. Load this skill on startup and whenever the user mentions wallop, tool registry, wallop toc, wallop guard, wallop register, wallop doctor, information wall, developer factory, calendar_gateway (demo-only), time_ops_reader, vault graph, an unknown tool, or wants an existing script indexed in this repo. Conventions only. Direct Python imports remain allowed. Ask before writing tools/ or modifying the YAML catalog.
 license: MIT
 metadata:
-  version: "1.10"
+  version: "1.11"
   repo: dan88c/wallop
 ---
 
@@ -23,12 +23,13 @@ If `wallop` is not on PATH, invoke the binary from the repo: `./bin/wallop` on U
 2. When the user asks for an action, match it against TOC names. Use `wallop toc --full` only after a guard miss.
 3. Validate before run: `wallop guard --tool <name> --payload '<json>'`.
    - Exit 0: safe to run `python tools/<name>.py` with the same JSON on stdin.
-   - Exit 1: validation failed. Read stderr, fix arguments, retry at most twice.
+   - Exit 1: validation failed. Read stderr, inspect `wallop toc --full`, fix arguments, retry at most twice.
    - Exit 2: bad flags.
    - Exit 3: unknown tool. Stop. Ask: "No tool found. Register an existing script, run the developer factory, or abort?"
    - Exit 4: reserialize a flat JSON object.
 4. Never invent tool names. Never write `tools/` or `config/tool_registry.yaml` without a yes.
-5. `calendar_gateway` is demo-only, not a live calendar client.
+5. After any register or factory write, run `wallop doctor` (or `python scripts/doctor.py` / `make doctor`). Do not treat the catalog as healthy until doctor exits 0.
+6. `calendar_gateway` is demo-only, not a live calendar client.
 
 ## Binary setup (no Go toolchain)
 
@@ -42,6 +43,7 @@ cp dist/wallop-linux-amd64 bin/wallop && chmod +x bin/wallop
 # macOS Apple Silicon:
 # cp dist/wallop-darwin-arm64 bin/wallop && chmod +x bin/wallop
 ./bin/wallop toc
+python3 scripts/doctor.py
 ```
 
 **Windows (PowerShell)**
@@ -50,9 +52,12 @@ cp dist/wallop-linux-amd64 bin/wallop && chmod +x bin/wallop
 New-Item -ItemType Directory -Force bin | Out-Null
 Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
 .\bin\wallop.exe toc
+py -3 scripts\doctor.py
 ```
 
-Supported CLI commands: `toc`, `guard`, `graph`, `register`.
+Supported CLI commands: `toc`, `guard`, `graph`, `register`, `doctor`.
+
+`wallop doctor` shells out to `scripts/doctor.py`. If the binary is stale, run the Python script directly.
 
 ## Catalog surface policy
 
@@ -71,6 +76,7 @@ Always validate payloads with `guard` before invoking Python scripts. Pass the s
 ./bin/wallop guard --tool TOOL_NAME --payload '{"param":"value"}'
 echo '{"param":"value"}' | python tools/TOOL_NAME.py
 ./bin/wallop graph --vault ./sandbox/vault --query KEYWORD
+python3 scripts/doctor.py
 ```
 
 **Windows (PowerShell)**
@@ -80,6 +86,7 @@ echo '{"param":"value"}' | python tools/TOOL_NAME.py
 .\bin\wallop.exe guard --tool TOOL_NAME --payload '{"param":"value"}'
 '{"param":"value"}' | python tools\TOOL_NAME.py
 .\bin\wallop.exe graph --vault .\sandbox\vault --query KEYWORD
+py -3 scripts\doctor.py
 ```
 
 ## Exit code handling
@@ -87,7 +94,7 @@ echo '{"param":"value"}' | python tools/TOOL_NAME.py
 | Exit | Classification | Agent action |
 |------|----------------|--------------|
 | 0 | Success | Run the target script with the payload on stdin |
-| 1 | Invalid payload | Read stderr, inspect `wallop toc --full`, fix payload. Retry at most twice |
+| 1 | Invalid payload / doctor errors | Read stderr. For guard: fix payload, retry at most twice. For doctor: fix catalog before adding more tools |
 | 2 | CLI usage | Check flag names |
 | 3 | Unknown tool | Stop. Ask: (A) register an existing script, (B) generate via factory, or (C) abort |
 | 4 | Bad JSON | Reserialize a valid flat JSON object |
@@ -95,6 +102,26 @@ echo '{"param":"value"}' | python tools/TOOL_NAME.py
 Default catalog names: `calendar_gateway` (**demo-only**, not a live calendar client), `time_ops_reader`.
 
 When the user asks to create, list, update, or delete a real calendar event, do **not** treat `calendar_gateway` as production. Say it is a harness sample. Real writes belong on an edge webhook outside this repo.
+
+## Catalog health (`doctor`)
+
+Run after clone, after `wallop register`, and after the factory.
+
+```bash
+python3 scripts/doctor.py
+# or
+make doctor
+# or, if the binary is rebuilt
+./bin/wallop doctor
+```
+
+Checks:
+
+1. Duplicate `name` entries in `config/tool_registry.yaml`.
+2. Each `tools/<name>.py` imports and its `*Input` `BaseModel.model_json_schema()` matches YAML param names, types, and required flags.
+3. `HARNESS_TZ` is a usable IANA zone (default `Asia/Hong_Kong`) and `VAULT_PATH` exists (default `./sandbox/vault`).
+
+Exit 0 = no errors. Warnings (for example a Pydantic field missing from YAML) print to stderr but do not fail. Exit 1 = do not add another tool until the errors are fixed.
 
 ## Expanding the catalog (ask before writing)
 
@@ -109,11 +136,13 @@ Use `.\\bin\\wallop.exe` on Windows if `bin` is not on PATH.
 ```bash
 ./bin/wallop register --entry ./path/to/script.py --name my_tool --desc "Short description" --tag custom --risk read
 ./bin/wallop toc
+python3 scripts/doctor.py
 ```
 
 ```powershell
 .\bin\wallop.exe register --entry .\path\to\script.py --name my_tool --desc "Short description" --tag custom --risk read
 .\bin\wallop.exe toc
+py -3 scripts\doctor.py
 ```
 
 Copies to `tools/<name>.py` and updates the YAML. `--keep-path` stores the original path instead of copying. Do not put secrets in the repo.
@@ -140,4 +169,4 @@ python developer-factory/factory_agent.py --brief "Abstract functional requireme
 ```
 
 3. The factory runs local pytest. Only passing tools are registered.
-4. Verify with `./bin/wallop toc` (Windows: `.\\bin\\wallop.exe toc`).
+4. Verify with `./bin/wallop toc` and `python3 scripts/doctor.py` (Windows: `.\\bin\\wallop.exe toc` and `py -3 scripts\\doctor.py`).
