@@ -1,5 +1,10 @@
 # Wallop
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/dan88c/wallop?include_prereleases&color=brightgreen)](https://github.com/dan88c/wallop/releases)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Go 1.22+](https://img.shields.io/badge/go-1.22+-00ADD8.svg)](https://go.dev/)
+
 A privacy-first, token-lean toolbox and execution harness for local small LLMs.
 
 Local small models (14B–36B class, ~64k context) struggle with two extremes: stuffing dozens of verbose JSON schemas into the prompt exhausts the window, while asking weak models to author code on the fly triggers hallucinations and retry loops.
