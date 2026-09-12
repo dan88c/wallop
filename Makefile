@@ -4,7 +4,7 @@ PY       ?= python3
 BIN      := bin/wallop
 PREFIX   ?= $(HOME)/.local
 
-.PHONY: help toc validate guard graph register test test-go test-py factory build install tidy sanitize demo bootstrap
+.PHONY: help toc validate guard graph register test test-go test-py factory build install tidy sanitize demo bootstrap doctor
 
 help:
 	@echo "wallop targets:"
@@ -13,6 +13,7 @@ help:
 	@echo "  make guard TOOL=name PAYLOAD='{...}'"
 	@echo "  make graph VAULT=./sandbox/vault QUERY=home"
 	@echo "  make register ENTRY=./x.py NAME=my_counter"
+	@echo "  make doctor     registry + schema + env health check"
 	@echo "  make demo"
 
 bootstrap:
@@ -55,6 +56,9 @@ sanitize:
 graph: build
 	@test -n "$(VAULT)$(WIKI)" || (echo "usage: make graph VAULT=./sandbox/vault QUERY=home"; exit 1)
 	$(BIN) graph --vault $(if $(VAULT),$(VAULT),$(WIKI)) --query '$(QUERY)'
+
+doctor:
+	$(PY) scripts/doctor.py --registry $(REGISTRY)
 
 test: test-go test-py
 

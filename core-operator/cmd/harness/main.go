@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -36,6 +37,8 @@ func main() {
 		os.Exit(cmdGraph(os.Args[2:]))
 	case "register":
 		os.Exit(cmdRegister(os.Args[2:]))
+	case "doctor":
+		os.Exit(cmdDoctor(os.Args[2:]))
 	case "help", "-h", "--help":
 		usage()
 		os.Exit(exitOK)
@@ -54,10 +57,11 @@ Commands:
   wallop guard --tool <name> [--payload <json>]
   wallop graph --vault <path> [--query <keyword>]
   wallop register --entry <script.py> --name <id> [--desc ...] [--tag t] [--param name:type[:required]] [--risk read|write] [--keep-path]
+  wallop doctor [--registry path]
 
 Exit codes:
   0 ok
-  1 invalid call (past date, bad enum, retry>2, missing param)
+  1 invalid call / doctor found errors
   2 usage
   3 unknown tool / registry
   4 unreadable payload
@@ -83,6 +87,58 @@ func defaultRegistry() string {
 		}
 	}
 	return "config/tool_registry.yaml"
+}
+
+func pythonBin() string {
+	for _, name := range []string{"python3", "python", "py"} {
+		if p, err := exec.LookPath(name); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+func cmdDoctor(args []string) int {
+	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	regPath := fs.String("registry", defaultRegistry(), "path to tool registry YAML")
+	if err := fs.Parse(args); err != nil {
+		return exitUsage
+	}
+
+	reg, err := registry.Load(*regPath)
+	if err != nil {
+		fail(exitUnknown, err.Error())
+		return exitUnknown
+	}
+	if dups := reg.DuplicateNames(); len(dups) > 0 {
+		fail(exitInvalid, "duplicate tool names: "+strings.Join(dups, ", "))
+		return exitInvalid
+	}
+
+	root := registry.RepoRootFromRegistry(*regPath)
+	script := filepath.Join(root, "scripts", "doctor.py")
+	if _, err := os.Stat(script); err != nil {
+		fail(exitUnknown, "scripts/doctor.py not found under "+root)
+		return exitUnknown
+	}
+	py := pythonBin()
+	if py == "" {
+		fail(exitUnknown, "python3 not on PATH; cannot import tools or check schemas")
+		return exitUnknown
+	}
+	cmd := exec.Command(py, script, "--registry", *regPath, "--root", root)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Env = os.Environ()
+	if err := cmd.Run(); err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return ee.ExitCode()
+		}
+		fail(exitInvalid, err.Error())
+		return exitInvalid
+	}
+	return exitOK
 }
 
 func cmdTOC(args []string) int {
@@ -285,7 +341,7 @@ func cmdRegister(args []string) int {
 	catalogEntry := *entry
 	copiedTo := ""
 	if !*keep {
-	destName := id + filepath.Ext(src)
+		destName := id + filepath.Ext(src)
 		if destName == id {
 			destName = id + ".py"
 		}

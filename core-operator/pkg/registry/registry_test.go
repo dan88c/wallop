@@ -50,3 +50,11 @@ tools:
 		t.Fatalf("full TOC missing required param: %s", full)
 	}
 }
+
+func TestDuplicateNames(t *testing.T) {
+	reg := &Registry{Tools: []Tool{{Name: "a"}, {Name: "b"}, {Name: "a"}}}
+	dups := reg.DuplicateNames()
+	if len(dups) != 1 || dups[0] != "a" {
+		t.Fatalf("got %#v", dups)
+	}
+}

@@ -13,6 +13,7 @@ Recommended conventions
 - Prefer a binary from `dist/` (or GitHub Releases). Do not require the user to install Go.
 - Prefer `wallop toc` over dumping the YAML. Use `--full` after a guard miss.
 - Prefer `wallop guard` before `tools/<name>.py`. Direct imports stay allowed.
+- After adding or registering a tool, run `wallop doctor` or `make doctor`.
 - Do not invent tool names.
 - If a tool is missing, ask whether to `wallop register --entry ... --name ...`, run the factory, or leave it outside the repo. Do not write `tools/` or the YAML without a yes.
 - Sanitize with `developer-factory/privacy_guard.py` before any cloud developer call.
