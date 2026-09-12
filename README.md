@@ -38,7 +38,7 @@ flowchart TD
         GoGraph -.->|local regex / wikilinks| Operator
         Operator -->|3. Validate payload| GoGuard[wallop guard]
         GoGuard -->|Exit 0| ToolRun[tools/*.py]
-        ToolRun -->|POST when live| EdgeGateway[Edge Gateway / Pi]
+        ToolRun -->|DEMO mock or sample POST| EdgeGateway[Edge Gateway / Pi]
         EdgeGateway --> CalendarAPI[Calendar API]
         GoGuard -->|Exit 3 unknown tool| AskUser[Ask user: register existing tool or run factory]
         AskUser --> Register[wallop register]
@@ -55,7 +55,7 @@ flowchart TD
     end
 ```
 
-Live calendar POST only when `MOCK_MODE=false` and an edge webhook is up. OAuth does not live in this repo.
+`tools/calendar_gateway.py` is **demo-only**: a sample pipe for bootstrap and tests, not a production calendar client. Keep `MOCK_MODE=true` unless you are deliberately exercising a local edge webhook. OAuth does not live in this repo.
 
 ## Installation
 
@@ -141,6 +141,8 @@ wallop graph --vault ./sandbox/vault --query home
 wallop register --entry ./path/to/script.py --name my_counter --desc "Count words" --tag text --param text:string:required
 ```
 
+`calendar_gateway` in the example above is the demo tool (tag `demo`).
+
 | Exit | Meaning | Suggested action |
 |------|---------|------------------|
 | 0 | Payload accepted | Run `tools/<name>.py` |
@@ -187,7 +189,7 @@ python developer-factory/factory_agent.py --brief "Calculate business days betwe
 | Variable | Default | Role |
 |----------|---------|------|
 | `MOCK_MODE` | `true` | No sockets |
-| `EDGE_CALENDAR_WEBHOOK` | `http://127.0.0.1:8088/webhook/calendar` | Live edge |
+| `EDGE_CALENDAR_WEBHOOK` | `http://127.0.0.1:8088/webhook/calendar` | Demo edge URL only |
 | `VAULT_PATH` | `./sandbox/vault` | `wallop graph` |
 | `HARNESS_TZ` | `Asia/Hong_Kong` | Past-date boundary |
 | `TIME_OPS_LOG_PATH` | `./data/time_ops.log` | Time-ops log |
@@ -204,7 +206,7 @@ python developer-factory/factory_agent.py --brief "Calculate business days betwe
 ├── core-operator/
 ├── developer-factory/
 ├── dist/                   # committed platform binaries
-├── tools/
+├── tools/                  # calendar_gateway.py is demo-only
 ├── skills/wallop/SKILL.md
 └── scripts/bootstrap.py
 ```
@@ -225,7 +227,7 @@ make factory ARGS='--name wiki_search --desc "Keyword search over a vault" --tag
 
 ## Security boundaries
 
-1. Calendar OAuth does not belong on the operator host. Writes stop at the edge webhook.
+1. `calendar_gateway` is a demo tool. Calendar OAuth does not belong on the operator host. Real writes, if any, stop at an edge webhook outside this repo.
 2. Cloud developer calls see only `privacy_guard.py` output.
 3. The recommended operator path uses registered names from the YAML. Direct Python remains available so other stacks are not blocked.
 
@@ -233,10 +235,10 @@ make factory ARGS='--name wiki_search --desc "Keyword search over a vault" --tag
 
 ```text
        __    __
-      /  \  /  \        WALLOP (`wallop`)
+      /  \\  /  \\        WALLOP (`wallop`)
      | () || () |       typed Go shell and information wall
-      \__/  \__/        mascot: mantis shrimp
-       /______\
-     /|  \__/  |\       shell = TOC compression, guard, register
-    |_|  /  \  |_|      punch = less prompt bloat, no vendor lock-in
+      \\__/  \\__/        mascot: mantis shrimp
+       /______\\
+     /|  \\__/  |\\       shell = TOC compression, guard, register
+    |_|  /  \\  |_|      punch = less prompt bloat, no vendor lock-in
 ```
