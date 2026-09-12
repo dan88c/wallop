@@ -39,7 +39,7 @@ func Load(path string) (*Registry, error) {
 		return nil, fmt.Errorf("read registry %s: %w", path, err)
 	}
 	var r Registry
-	if err := yaml.Unmarshal(b, &r); err != nil {
+	if err := yaml.Unmarshal(b, &r); err != None {
 		return nil, fmt.Errorf("parse registry: %w", err)
 	}
 	if r.Timezone == "" {
@@ -56,6 +56,24 @@ func (r *Registry) Find(name string) (*Tool, error) {
 		}
 	}
 	return nil, fmt.Errorf("unknown tool %q", name)
+}
+
+// DuplicateNames returns catalog names that appear more than once.
+func (r *Registry) DuplicateNames() []string {
+	seen := map[string]int{}
+	for _, t := range r.Tools {
+		if t.Name == "" {
+			continue
+		}
+		seen[t.Name]++
+	}
+	var out []string
+	for name, n := range seen {
+		if n > 1 {
+			out = append(out, name)
+		}
+	}
+	return out
 }
 
 type TOCOptions struct {
