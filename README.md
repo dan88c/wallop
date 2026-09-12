@@ -47,6 +47,14 @@ Copy-Item dist\wallop-windows-amd64.exe bin\wallop.exe
 
 macOS Apple Silicon: copy `dist/wallop-darwin-arm64` instead of the linux binary.
 
+Information Wall (titles never leave the machine):
+
+```text
+{"title": "go to the hospital with the boss"}
+        ->
+{"intent": "calendar_check", "entities": []}
+```
+
 Point the operator at the skill or it will not use Wallop on its own. Paste into Hermes / Ollama / Open WebUI system prompt:
 
 ```text
@@ -253,6 +261,24 @@ python developer-factory/factory_agent.py --name wiki_search --desc "Keyword sea
 python developer-factory/factory_agent.py --brief "Calculate business days between two ISO dates"
 ```
 
+### Information Wall demo (passing test)
+
+Covered by `tests/python_tests/test_privacy_guard.py`. Private titles are dropped; the cloud developer only sees an intent.
+
+```python
+from privacy_guard import sanitize_payload
+
+out = sanitize_payload({"title": "go to the hospital with the boss"})
+assert out.cloud_spec() == {"intent": "calendar_check", "entities": []}
+```
+
+```text
+input:  {"title": "go to the hospital with the boss"}
+output: {"intent": "calendar_check", "entities": []}
+```
+
+`hospital` and `boss` do not appear in `cloud_spec()` or `cloud_payload()`.
+
 ## Configuration
 
 | Variable | Default | Role |
@@ -304,10 +330,10 @@ make factory ARGS='--name wiki_search --desc "Keyword search over a vault" --tag
 
 ```text
        __    __
-      /  \  /  \        WALLOP (`wallop`)
+      /  \\  /  \\        WALLOP (`wallop`)
      | () || () |       typed Go shell and information wall
-      \__/  \__/        mascot: mantis shrimp
-       /______\
-     /|  \__/  |\       shell = TOC compression, guard, register
-    |_|  /  \  |_|      punch = less prompt bloat, no vendor lock-in
+      \\__/  \\__/        mascot: mantis shrimp
+       /______\\
+     /|  \\__/  |\\       shell = TOC compression, guard, register
+    |_|  /  \\  |_|      punch = less prompt bloat, no vendor lock-in
 ```
