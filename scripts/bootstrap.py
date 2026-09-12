@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
 import shutil
+import stat
 import subprocess
 import sys
 import venv
@@ -18,6 +20,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 VENV = ROOT / ".venv"
 REQ = ROOT / "developer-factory" / "requirements.txt"
+
+# (system, machine) -> filename under dist/
+_DIST_BINARIES = {
+    ("linux", "x86_64"): "wallop-linux-amd64",
+    ("linux", "amd64"): "wallop-linux-amd64",
+    ("darwin", "arm64"): "wallop-darwin-arm64",
+    ("darwin", "aarch64"): "wallop-darwin-arm64",
+    ("windows", "amd64"): "wallop-windows-amd64.exe",
+    ("windows", "x86_64"): "wallop-windows-amd64.exe",
+}
 
 
 def venv_python() -> Path:
@@ -57,7 +69,7 @@ def test_py(py: Path) -> int:
 def test_go() -> int:
     go = shutil.which("go")
     if not go:
-        print("Go not on PATH; skipping Go tests (install Go 1.22+ for the wallop CLI)")
+        print("Go not on PATH; skipping Go tests (prebuilt dist/ binary is enough for toc/guard)")
         return 0
     code = run([go, "test", "./..."], cwd=ROOT / "core-operator", check=False)
     if code != 0:
@@ -65,11 +77,43 @@ def test_go() -> int:
     return run([go, "test", "./..."], cwd=ROOT / "tests" / "go_tests", check=False)
 
 
-def build_go() -> int:
+def dist_binary_name() -> str | None:
+    system = platform.system().lower()
+    machine = platform.machine().lower()
+    return _DIST_BINARIES.get((system, machine))
+
+
+def install_prebuilt() -> tuple[int, str | None]:
+    """Copy dist/wallop-* into bin/ when Go is missing."""
+    name = dist_binary_name()
+    if not name:
+        print(
+            f"[INFO] Go not found and no prebuilt binary for "
+            f"{platform.system()} {platform.machine()}"
+        )
+        return 0, None
+    src = ROOT / "dist" / name
+    if not src.is_file():
+        print(f"[INFO] Go not found and {src} is missing")
+        return 0, None
+    dest_name = "wallop.exe" if name.endswith(".exe") else "wallop"
+    dest_dir = ROOT / "bin"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / dest_name
+    print("[INFO] Go not found, using prebuilt binary from dist/")
+    shutil.copy2(src, dest)
+    if os.name != "nt":
+        dest.chmod(dest.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    rel_dest = dest.relative_to(ROOT).as_posix()
+    rel_src = src.relative_to(ROOT).as_posix()
+    print(f"[OK] {rel_dest} -> {rel_src} (Go missing, fallback active)")
+    return 0, f"{rel_dest} -> {rel_src}"
+
+
+def build_go() -> tuple[int, str | None]:
     go = shutil.which("go")
     if not go:
-        print("Go not on PATH; skipped wallop binary")
-        return 0
+        return install_prebuilt()
     name = "wallop.exe" if os.name == "nt" else "wallop"
     out_root = ROOT / "bin"
     out_go = ROOT / "core-operator" / "bin"
@@ -77,9 +121,10 @@ def build_go() -> int:
     out_go.mkdir(parents=True, exist_ok=True)
     code = run([go, "build", "-o", str(out_root / name), "./cmd/harness"], cwd=ROOT / "core-operator", check=False)
     if code != 0:
-        return code
+        return code, None
     legacy = "harness.exe" if os.name == "nt" else "harness"
-    return run([go, "build", "-o", str(out_go / legacy), "./cmd/harness"], cwd=ROOT / "core-operator", check=False)
+    code = run([go, "build", "-o", str(out_go / legacy), "./cmd/harness"], cwd=ROOT / "core-operator", check=False)
+    return code, None
 
 
 def demo(py: Path) -> int:
@@ -107,8 +152,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     do_all = not selected and not args.deps
 
+    fallback = None
     if do_all or args.build:
-        code = build_go()
+        code, fallback = build_go()
         if code != 0:
             return code
     if do_all or args.test:
@@ -122,7 +168,9 @@ def main(argv: list[str] | None = None) -> int:
         code = demo(py)
         if code != 0:
             return code
-    print("bootstrap OK")
+    print("DEMO OK")
+    if fallback:
+        print(f"[OK] {fallback} (Go missing, fallback active)")
     return 0
 
 
