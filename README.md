@@ -270,7 +270,31 @@ Doctor checks:
 
 Exit 0 with warnings is fine. The current demo catalog warns that `calendar_gateway` has an `extra` Pydantic field not listed in YAML. Exit 1 means fix the catalog before adding another tool.
 
-Token cost of `wallop toc` vs `wallop toc --full` is pending a later measurement. No placeholder figures here.
+## Prompt cost reduction
+
+Measured from repo root on the default demo catalog (`calendar_gateway`, `time_ops_reader`) after `.\bin\wallop.exe toc` / `toc --full`, versus reading every `tools/*.py` the way an agent does without a TOC.
+
+| Surface | Bytes in context (this catalog) | Approx. tokens (chars ÷ 4) | When to load |
+|---------|---------------------------------|----------------------------|--------------|
+| `wallop toc` | 129 chars | ~30 | Session baseline. Names + tags only. |
+| `wallop toc --full` | 596 chars | ~150 | After a guard miss or unknown params. |
+| Raw scripts (`tools/*.py` except `__init__.py`) | 4,923 chars (82 + 86 lines) | ~1,200 | Do not preload. Open a file only to edit or debug. |
+
+Same two tools: short TOC is about **38× smaller** than the Python sources, and `--full` is still about **8× smaller**.
+
+The ratio widens as the catalog grows. Each new tool adds one short TOC line, but another ~2–3k characters if the operator reads the implementation. Weak local models (14B–36B) should keep the raw `.py` out of the prompt and use `wallop guard` on a flat JSON payload instead.
+
+Re-measure after you add tools:
+
+```powershell
+$toc  = & .\bin\wallop.exe toc | Out-String
+$full = & .\bin\wallop.exe toc --full | Out-String
+"toc        $($toc.Length) chars"
+"toc --full $($full.Length) chars"
+Get-ChildItem tools\*.py | Where-Object { $_.Name -ne '__init__.py' } | ForEach-Object {
+  $c = Get-Content $_.FullName -Raw
+  "{0,-24} {1,5} lines  {2,6} chars" -f $_.Name, @(Get-Content $_.FullName).Count, $c.Length
+}
 
 ## Bring your own tools
 
