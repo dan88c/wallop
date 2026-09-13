@@ -12,7 +12,7 @@ metadata:
 
 Project release **1.1.000** (`VERSION`). Skill protocol **1.12**.
 
-Load on session start, when cwd is a wallop checkout, when the user names a wallop command, or when a requested capability is missing from the last `wallop toc`.
+Do not assume this skill is active for every session. See **When to Load This Skill**. Ask once at cold start unless the user already named a wallop command.
 
 Working directory = repo root. Set `WALLOP_ROOT` if the CLI cannot walk up to `config/tool_registry.yaml`. Adapt path separators (Bash vs PowerShell).
 
@@ -32,7 +32,7 @@ If `wallop` is not on PATH, use `./bin/wallop` or `.\bin\wallop.exe`. Do not ass
 4. Never invent tool names. Never write `tools/` or `config/tool_registry.yaml` without a yes.
 5. After register or factory, run `wallop doctor` (or `python scripts/doctor.py`). Do not add another tool until doctor exits 0. Warnings on stderr are OK.
 6. `calendar_gateway` is demo-only, not a live calendar client.
-7. Weak local models (14B–36B) must never write tool implementations, Go code, or shell wrappers.
+7. Weak local models (14B–36B) must never write tool implementations, Go code, or shell wrappers. Do not preload `tools/*.py` into the prompt; use `wallop toc` instead.
 
 ## When to Load This Skill
 
