@@ -1,16 +1,16 @@
 ---
 name: wallop
-description: Recommended operator protocol for the wallop toolbox. Load this skill on startup and whenever the user mentions wallop, tool registry, wallop toc, wallop guard, wallop register, wallop doctor, wallop version, information wall, developer factory, calendar_gateway (demo-only), time_ops_reader, vault graph, an unknown tool, or wants an existing script indexed in this repo. Conventions only. Direct Python imports remain allowed. Ask before writing tools/ or modifying the YAML catalog.
+description: Local wallop tool governor. Load when the user names wallop, toc, guard, register, factory, or cwd is a wallop checkout.
 license: MIT
 metadata:
   version: "1.12"
-  release: "1.0.001"
+  release: "1.1.000"
   repo: dan88c/wallop
 ---
 
 # wallop operator skill
 
-Project release **1.0.001** (`VERSION`). Skill protocol **1.12**.
+Project release **1.1.000** (`VERSION`). Skill protocol **1.12**.
 
 Load on session start, when cwd is a wallop checkout, when the user names a wallop command, or when a requested capability is missing from the last `wallop toc`.
 
@@ -33,6 +33,13 @@ If `wallop` is not on PATH, use `./bin/wallop` or `.\bin\wallop.exe`. Do not ass
 5. After register or factory, run `wallop doctor` (or `python scripts/doctor.py`). Do not add another tool until doctor exits 0. Warnings on stderr are OK.
 6. `calendar_gateway` is demo-only, not a live calendar client.
 7. Weak local models (14B–36B) must never write tool implementations, Go code, or shell wrappers.
+
+## When to Load This Skill
+
+- Cold start or cwd is a wallop checkout: ask once if this session has not approved yet.
+- Explicit request (user named wallop, toc, guard, register, doctor, factory): load. Do not ask again this session.
+- No other skill fits and you would otherwise guess: ask once, then load. Do not invent a command.
+- Already loaded and the last `wallop toc` has no match: stay loaded; follow exit 3 (register / factory / abort).
 
 ## Binary (no Go required)
 
