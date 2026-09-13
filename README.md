@@ -7,6 +7,8 @@
 
 A privacy-first, token-lean toolbox and execution harness for local small LLMs.
 
+Release **1.1.000**. Operator skill protocol **1.12** (`skills/wallop/SKILL.md`).
+
 Local small models (14B–36B class, ~64k context) struggle with two extremes: stuffing dozens of verbose JSON schemas into the prompt exhausts the window, while asking weak models to author code on the fly triggers hallucinations and retry loops.
 
 **Wallop consolidates tool governance into one managed box.** The local model is the 24/7 **Operator**: it discovers tools from a compressed Table of Contents and can execute registered Python scripts without switching frameworks. When a capability is missing, Wallop can delegate creation to an on-demand **Developer** loop behind a deterministic **Information Wall**, so private notes, calendar titles, and host credentials stay on the machine.
@@ -24,6 +26,7 @@ No API key. No committed binaries. One command installs deps, runs the demo, pla
 ```bash
 git clone https://github.com/dan88c/wallop.git && cd wallop
 python3 scripts/bootstrap.py --download
+./bin/wallop version
 ./bin/wallop toc
 ```
 
@@ -32,6 +35,7 @@ Windows:
 ```powershell
 git clone https://github.com/dan88c/wallop.git; cd wallop
 py -3 scripts\bootstrap.py --download
+.\bin\wallop.exe version
 .\bin\wallop.exe toc
 ```
 
@@ -45,18 +49,21 @@ Information Wall (titles never leave the machine):
 {"intent": "calendar_check", "entities": []}
 ```
 
-Point the operator at the skill or it will not use Wallop on its own. Paste into Hermes / Ollama / Open WebUI system prompt:
+Point the operator at the skill or it will not use Wallop on its own. Do **not** auto-load the skill on every session. Paste into Hermes / Ollama / Open WebUI system prompt:
 
 ```text
-Read skills/wallop/SKILL.md on startup and on any unknown tool request.
-Run wallop toc before guessing tools. Validate with wallop guard before python tools/<name>.py.
-Exit 3 = ask the human before register or factory.
+You have the wallop skill at skills/wallop/SKILL.md.
+Ask once at cold start before reading it, unless the user already named
+wallop, toc, guard, register, doctor, or factory.
+After yes: read SKILL.md, then run wallop toc. Do not read tools/*.py.
+Validate with wallop guard before python tools/<name>.py.
+Exit 3 = ask before register or factory.
 After register or factory, run wallop doctor (or python scripts/doctor.py).
 ```
 
 ## Why Wallop
 
-1. **Context exhaustion.** `wallop toc` is name + tags only. Use `--full` after a guard miss.
+1. **Context exhaustion.** `wallop toc` is name + tags only. Use `--full` after a guard miss. Do not preload `tools/*.py`.
 2. **No framework lock-in.** Tools stay ordinary Pydantic scripts in one YAML catalog.
 3. **Asymmetric intelligence.** Routine calls stay local at $0. Code generation is a single burst through the wall, only when something is missing and the user wants a new file here.
 
@@ -65,7 +72,7 @@ After register or factory, run wallop doctor (or python scripts/doctor.py).
 | Host | Windows / Linux / macOS | Cloud API or a second local host |
 | Model | Local 14B–36B | Stronger model, or offline mock |
 | Runtime | Static `wallop` binary, or direct Python | Python 3.11+ factory |
-| Job | TOC, guard, graph, register, doctor | Propose Pydantic tools + pytest |
+| Job | TOC, guard, graph, register, doctor, version | Propose Pydantic tools + pytest |
 | Cost | $0 for routine calls | One call on a gap |
 
 ## Architecture
@@ -202,9 +209,11 @@ New-Item -ItemType Directory -Force -Path "$HOME\.agents\skills" | Out-Null
 New-Item -Type SymbolicLink -Path "$HOME\.agents\skills\wallop" -Target "$PWD\skills\wallop"
 ```
 
+A symlink only exposes the path. It does not mean “load on every startup.”
+
 ### 6. Instructing your agent
 
-A symlink is not enough. The operator only follows Wallop if the system prompt tells it to load the skill.
+The operator follows Wallop only if the host prompt points at the skill **and** the skill’s load gate is respected (protocol 1.12).
 
 Add this to Hermes, Ollama, Open WebUI, or any local agent instructions:
 
@@ -214,24 +223,28 @@ Add this to Hermes, Ollama, Open WebUI, or any local agent instructions:
 You have the wallop skill at skills/wallop/SKILL.md
 (or ~/.agents/skills/wallop after the optional symlink).
 
-On startup and on any unknown tool request:
-1. Read skills/wallop/SKILL.md.
-2. Run wallop toc. Do not assume tools exist until they appear there.
+1. Cold start / cwd is a wallop checkout: ask once before reading SKILL.md
+   unless this session already approved, or the user already named
+   wallop, toc, guard, register, doctor, or factory.
+2. After yes: read skills/wallop/SKILL.md. Then run wallop toc.
+   Do not assume tools exist until they appear there. Do not read tools/*.py.
 3. Before python tools/<name>.py, run:
    wallop guard --tool <name> --payload '<json>'
 4. Exit 0 = run the script with the same JSON on stdin.
    Exit 1 = fix payload, retry at most twice.
    Exit 3 = stop and ask the human before wallop register or the factory.
 5. After register or factory, run python scripts/doctor.py (or wallop doctor).
+   Factory pytest failure does not update the YAML. Retry factory at most twice.
 ```
 
 Shorter variant:
 
-> Read `skills/wallop/SKILL.md` to learn your tool execution rules. Always run `wallop toc` to discover tools before guessing. Validate parameters with `wallop guard` before running any script. If a tool is missing (exit 3), ask the user before touching the factory. After any catalog write, run `wallop doctor`.
+> Ask once before loading `skills/wallop/SKILL.md` at cold start. If the user already named a wallop command, load immediately. Run `wallop toc` before guessing tools. Validate with `wallop guard`. Exit 3 = ask before register or factory. After any catalog write, run `wallop doctor`. Do not preload `tools/*.py`.
 
 ## CLI
 
 ```bash
+wallop version
 wallop toc
 wallop toc --full
 wallop guard --tool calendar_gateway --payload '{"action":"list"}'
@@ -251,7 +264,7 @@ python3 scripts/doctor.py
 | 3 | Unknown tool | Ask: `wallop register` or factory |
 | 4 | Bad JSON | Reserialize a flat object |
 
-`wallop` walks up from cwd (or uses `WALLOP_ROOT`) to find `config/tool_registry.yaml`.
+`wallop` walks up from cwd (or uses `WALLOP_ROOT`) to find `config/tool_registry.yaml`. Guard `--payload` is a flat JSON object of arguments; pass the name with `--tool`.
 
 ## Catalog health
 
@@ -276,7 +289,7 @@ Measured from repo root on the default demo catalog (`calendar_gateway`, `time_o
 
 | Surface | Bytes in context (this catalog) | Approx. tokens (chars ÷ 4) | When to load |
 |---------|---------------------------------|----------------------------|--------------|
-| `wallop toc` | 129 chars | ~30 | Session baseline. Names + tags only. |
+| `wallop toc` | 129 chars | ~30 | Session baseline after the skill is approved. Names + tags only. |
 | `wallop toc --full` | 596 chars | ~150 | After a guard miss or unknown params. |
 | Raw scripts (`tools/*.py` except `__init__.py`) | 4,923 chars (82 + 86 lines) | ~1,200 | Do not preload. Open a file only to edit or debug. |
 
@@ -295,6 +308,15 @@ Get-ChildItem tools\*.py | Where-Object { $_.Name -ne '__init__.py' } | ForEach-
   $c = Get-Content $_.FullName -Raw
   "{0,-24} {1,5} lines  {2,6} chars" -f $_.Name, @(Get-Content $_.FullName).Count, $c.Length
 }
+```
+
+```bash
+echo "toc        $(./bin/wallop toc | wc -c) chars"
+echo "toc --full $(./bin/wallop toc --full | wc -c) chars"
+wc -c -l tools/*.py
+```
+
+These figures are catalog-specific, not a tokenizer benchmark. The useful claim is the **ratio**, not the exact token integer.
 
 ## Bring your own tools
 
@@ -316,6 +338,8 @@ The factory is only for generating a *new* stub when no ready file exists.
 - **Default (`MOCK_MODE=true`):** deterministic offline templates. No API key, no internet, no second LLM. Fine for clone-and-demo.
 - **Recommended live path:** a frontier coding model via API (Claude 3.5 Sonnet, GPT-4o, DeepSeek-Coder, or OpenRouter) through `CLOUD_DEVELOPER_URL` and `CLOUD_DEVELOPER_TOKEN`. Only a sanitized abstract from `privacy_guard.py` may leave the machine.
 - **Local alternative:** a strong secondary coder (70B+ or a dedicated coding checkpoint). Do not point the factory at the local 14B–36B operator.
+
+On pytest failure the factory does **not** update the YAML. Retry at most twice with a tighter `--brief` or explicit `--name --desc --param`, then stop and ask the human.
 
 ```bash
 # Offline / demo (default)
@@ -366,12 +390,13 @@ output: {"intent": "calendar_check", "entities": []}
 ```text
 .
 ├── AGENTS.md
+├── VERSION                 # 1.1.000
 ├── config/tool_registry.yaml
 ├── core-operator/
 ├── developer-factory/
 ├── dist/                   # .gitkeep only; binaries come from Releases or make build
 ├── tools/                  # calendar_gateway.py is demo-only
-├── skills/wallop/SKILL.md
+├── skills/wallop/SKILL.md  # protocol 1.12
 ├── scripts/bootstrap.py    # --download + doctor status table
 └── scripts/doctor.py       # catalog health check
 ```
