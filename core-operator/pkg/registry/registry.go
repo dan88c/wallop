@@ -17,13 +17,24 @@ type Param struct {
 	Notes    string   `yaml:"notes,omitempty"`
 }
 
+type OSCommand struct {
+	Windows string `yaml:"windows,omitempty"`
+	Posix   string `yaml:"posix,omitempty"`
+}
+
 type Tool struct {
-	Name   string   `yaml:"name"`
-	Desc   string   `yaml:"desc"`
-	Tags   []string `yaml:"tags"`
-	Entry  string   `yaml:"entry"`
-	Risk   string   `yaml:"risk"`
-	Params []Param  `yaml:"params"`
+	Name    string    `yaml:"name"`
+	Desc    string    `yaml:"desc"`
+	Details string    `yaml:"details,omitempty"`
+	Tags    []string  `yaml:"tags"`
+	Entry   string    `yaml:"entry"`
+	Risk    string    `yaml:"risk"`
+	Runtime string    `yaml:"runtime,omitempty"`
+	Venv    string    `yaml:"venv,omitempty"`
+	Command OSCommand `yaml:"command,omitempty"`
+	Argv    []string  `yaml:"argv,omitempty"`
+	Cwd     string    `yaml:"cwd,omitempty"`
+	Params  []Param   `yaml:"params"`
 }
 
 type Registry struct {
@@ -58,7 +69,6 @@ func (r *Registry) Find(name string) (*Tool, error) {
 	return nil, fmt.Errorf("unknown tool %q", name)
 }
 
-// DuplicateNames returns catalog names that appear more than once.
 func (r *Registry) DuplicateNames() []string {
 	seen := map[string]int{}
 	for _, t := range r.Tools {
@@ -81,7 +91,6 @@ type TOCOptions struct {
 	Tag  string
 }
 
-// RenderTOC is the progressive-disclosure surface for a weak operator model.
 func RenderTOC(r *Registry, opt TOCOptions) (string, error) {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "registry v%d tz=%s tools=%d\n", r.Version, r.Timezone, len(r.Tools))
