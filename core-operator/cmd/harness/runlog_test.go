@@ -17,7 +17,8 @@ func mockReg(t *testing.T) (root, reg string) {
 	_ = os.MkdirAll(filepath.Join(root, "tools"), 0o755)
 	_ = os.WriteFile(filepath.Join(root, "tools", "echo_tool.py"), []byte("x\n"), 0o644)
 	reg = filepath.Join(root, "config", "tool_registry.yaml")
-	_ = os.WriteFile(reg, []byte("version: 1\ntimezone: Asia/Hong_Kong\ntools:\n  - name: echo_tool\n    desc: short\n    details: long\n    tags: [test]\n    entry: tools/echo_tool.py\n    risk: read\n    params:\n      - name: q\n        type: string\n        required: true\n"), 0o644)
+	body := "version: 1\ntimezone: Asia/Hong_Kong\ntools:\n  - name: echo_tool\n    desc: short\n    details: long\n    tags: [test]\n    entry: tools/echo_tool.py\n    risk: read\n    params:\n      - name: q\n        type: string\n        required: true\n"
+	_ = os.WriteFile(reg, []byte(body), 0o644)
 	return root, reg
 }
 
@@ -60,10 +61,10 @@ func TestCmdPathDescRunMock(t *testing.T) {
 		t.Fatalf("desc %d %#v", code, out)
 	}
 	runProcess = func(argv []string, cwd string, stdin []byte) processResult {
-		return processResult{Stdout: ` + "`{\"ok\":true}`" + `}
+		return processResult{Stdout: "{\"ok\":true}"}
 	}
 	code, out = capJSON(t, func() int {
-		return cmdRun([]string{"--registry", reg, "--tool", "echo_tool", "--payload", ` + "`{\"q\":\"hi\"}`" + `})
+		return cmdRun([]string{"--registry", reg, "--tool", "echo_tool", "--payload", "{\"q\":\"hi\"}"})
 	})
 	if code != 0 {
 		t.Fatalf("run ok %d %#v", code, out)
@@ -72,7 +73,7 @@ func TestCmdPathDescRunMock(t *testing.T) {
 		return processResult{Stderr: strings.Repeat("E", 3000), Err: errors.New("boom")}
 	}
 	code, out = capJSON(t, func() int {
-		return cmdRun([]string{"--registry", reg, "--tool", "echo_tool", "--payload", ` + "`{\"q\":\"hi\"}`" + `})
+		return cmdRun([]string{"--registry", reg, "--tool", "echo_tool", "--payload", "{\"q\":\"hi\"}"})
 	})
 	if code != exitChild {
 		t.Fatalf("want 5 got %d", code)
@@ -86,7 +87,7 @@ func TestCmdPathDescRunMock(t *testing.T) {
 		return processResult{}
 	}
 	code, _ = capJSON(t, func() int {
-		return cmdRun([]string{"--registry", reg, "--tool", "echo_tool", "--payload", ` + "`{}`" + `})
+		return cmdRun([]string{"--registry", reg, "--tool", "echo_tool", "--payload", "{}"})
 	})
 	if code != exitInvalid || called {
 		t.Fatalf("guard block code=%d called=%v", code, called)
