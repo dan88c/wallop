@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,9 +11,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/dan88c/wallop/core-operator/pkg/guard"
-	"github.com/dan88c/wallop/core-operator/pkg/registry"
 )
 
 const exitChild = 5
