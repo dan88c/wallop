@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,12 +14,45 @@ import (
 	"github.com/dan88c/wallop/core-operator/pkg/registry"
 )
 
+func sanitizePayload(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "\ufeff")
+	if len(s) >= 2 {
+		if (s[0] == '\'' && s[len(s)-1] == '\'') || (s[0] == '`' && s[len(s)-1] == '`') {
+			s = s[1 : len(s)-1]
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
+func loadPayload(rawFlag, fileFlag string) (string, map[string]any, error) {
+	s := rawFlag
+	if fileFlag != "" {
+		b, err := os.ReadFile(fileFlag)
+		if err != nil {
+			return "", nil, err
+		}
+		b = bytes.TrimPrefix(b, []byte{0xEF, 0xBB, 0xBF})
+		s = string(b)
+	}
+	s = sanitizePayload(s)
+	if s == "" {
+		s = "{}"
+	}
+	out := map[string]any{}
+	if err := json.Unmarshal([]byte(s), &out); err != nil || out == nil {
+		return s, nil, err
+	}
+	return s, out, nil
+}
+
 func cmdRun(args []string) int {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	regPath := fs.String("registry", defaultRegistry(), "")
 	toolName := fs.String("tool", "", "")
 	payloadRaw := fs.String("payload", "{}", "")
+	payloadFile := fs.String("payload-file", "", "")
 	if fs.Parse(args) != nil {
 		return exitUsage
 	}
@@ -26,8 +60,8 @@ func cmdRun(args []string) int {
 		fail(exitUsage, "missing --tool")
 		return exitUsage
 	}
-	raw := map[string]any{}
-	if json.Unmarshal([]byte(*payloadRaw), &raw) != nil || raw == nil {
+	source, raw, err := loadPayload(*payloadRaw, *payloadFile)
+	if err != nil || raw == nil {
 		fail(exitBadPayload, "parse --payload")
 		return exitBadPayload
 	}
@@ -92,7 +126,7 @@ func cmdRun(args []string) int {
 	if res.Err != nil {
 		code = exitChild
 	}
-	logPath := writeRunLog(root, tool.Name, code, argv, *payloadRaw, res.Stdout, res.Stderr)
+	logPath := writeRunLog(root, tool.Name, code, argv, source, res.Stdout, res.Stderr)
 	printJSON(map[string]any{"ok": code == 0, "code": code, "tool": tool.Name, "argv": argv, "log": logPath, "stdout_head": clip(res.Stdout, 2048), "stderr_head": clip(res.Stderr, 2048)})
 	return code
 }
