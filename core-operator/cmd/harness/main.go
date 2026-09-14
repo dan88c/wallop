@@ -1,17 +1,8 @@
 package main
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-
-	"github.com/dan88c/wallop/core-operator/pkg/graph"
-	"github.com/dan88c/wallop/core-operator/pkg/guard"
-	"github.com/dan88c/wallop/core-operator/pkg/registry"
 )
 
 const (
