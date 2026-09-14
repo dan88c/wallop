@@ -1,15 +1,9 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
-	"github.com/dan88c/wallop/core-operator/pkg/guard"
 	"github.com/dan88c/wallop/core-operator/pkg/registry"
 )
 
