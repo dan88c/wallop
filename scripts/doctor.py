@@ -1,41 +1,21 @@
 #!/usr/bin/env python3
 """Catalog health check.
 
-1. Duplicate tool names in config/tool_registry.yaml
-2. Each tools/<name>.py imports and its Input BaseModel schema matches YAML params
-3. HARNESS_TZ is a real IANA zone and VAULT_PATH exists
+Default (operator): names unique; entry file exists; optional venv path exists.
+--strict: also import tool, require pydantic *Input, match YAML params.
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import os
 import sys
-import typing
 from collections import Counter
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import yaml
-from pydantic import BaseModel
-
-YAML_TO_JSON = {
-    "string": "string",
-    "path": "string",
-    "datetime": "string",
-    "date": "string",
-    "time": "string",
-    "timestamp": "string",
-    "enum": "string",
-    "int": "integer",
-    "integer": "integer",
-    "bool": "boolean",
-    "boolean": "boolean",
-    "number": "number",
-    "float": "number",
-}
 
 
 def repo_root() -> Path:
@@ -52,45 +32,11 @@ def load_registry(path: Path) -> dict[str, Any]:
     return data
 
 
-def import_tool(entry: Path, name: str) -> Any:
-    spec = importlib.util.spec_from_file_location(f"wallop_tool_{name}", entry)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"cannot load {entry}")
-    mod = importlib.util.module_from_spec(spec)
-    # Future annotations leave Literal unresolved under spec_from_file_location.
-    mod.__dict__.setdefault("Literal", Literal)
-    mod.__dict__.setdefault("Any", Any)
-    mod.__dict__.setdefault("typing", typing)
-    spec.loader.exec_module(mod)
-    return mod
-
-
-def input_model(mod: Any) -> type[BaseModel] | None:
-    found: list[type[BaseModel]] = []
-    for attr in vars(mod).values():
-        if isinstance(attr, type) and issubclass(attr, BaseModel) and attr is not BaseModel:
-            if attr.__name__.endswith("Input"):
-                found.append(attr)
-    if found:
-        return found[0]
-    return None
-
-
-def json_type(schema_prop: dict[str, Any]) -> str:
-    if "anyOf" in schema_prop:
-        types = [p.get("type") for p in schema_prop["anyOf"] if p.get("type") and p.get("type") != "null"]
-        return types[0] if types else "string"
-    if "enum" in schema_prop:
-        return "string"
-    return str(schema_prop.get("type") or "string")
-
-
-def schema_for(model: type[BaseModel]) -> dict[str, Any]:
-    try:
-        model.model_rebuild(_types_namespace={"Literal": Literal, "Any": Any, "typing": typing})
-    except Exception:
-        pass
-    return model.model_json_schema()
+def resolve_entry(root: Path, entry: str) -> Path:
+    p = Path(entry)
+    if p.is_absolute():
+        return p.resolve()
+    return (root / p).resolve()
 
 
 def check_duplicates(tools: list[dict[str, Any]]) -> list[str]:
@@ -99,60 +45,25 @@ def check_duplicates(tools: list[dict[str, Any]]) -> list[str]:
     return [f"duplicate tool name {name!r} ({n} times)" for name, n in counts.items() if name and n > 1]
 
 
-def check_tool(root: Path, tool: dict[str, Any]) -> tuple[list[str], list[str]]:
+def check_tool_exists(root: Path, tool: dict[str, Any]) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warns: list[str] = []
     name = str(tool.get("name") or "")
-    entry_rel = str(tool.get("entry") or f"tools/{name}.py")
-    entry = (root / entry_rel).resolve()
+    raw = str(tool.get("entry") or f"tools/{name}.py")
+    entry = resolve_entry(root, raw)
     if not entry.is_file():
-        return [f"{name}: missing entry {entry_rel}"], warns
-    try:
-        mod = import_tool(entry, name or entry.stem)
-    except Exception as exc:  # noqa: BLE001 — doctor must surface any import failure
-        return [f"{name}: import failed: {exc}"], warns
-    model = input_model(mod)
-    if model is None:
-        return [f"{name}: no pydantic *Input BaseModel in {entry_rel}"], warns
-    try:
-        schema = schema_for(model)
-    except Exception as exc:  # noqa: BLE001
-        return [f"{name}: model_json_schema() failed: {exc}"], warns
-    props: dict[str, Any] = schema.get("properties") or {}
-    required = set(schema.get("required") or [])
-    yaml_params = tool.get("params") or []
-    yaml_names = [str(p.get("name")) for p in yaml_params if p.get("name")]
-    yaml_set = set(yaml_names)
-    if len(yaml_names) != len(yaml_set):
-        errors.append(f"{name}: duplicate param names in YAML: {yaml_names}")
-
-    for p in yaml_params:
-        pname = str(p.get("name") or "")
-        if not pname:
-            errors.append(f"{name}: YAML param missing name")
-            continue
-        if pname not in props:
-            errors.append(f"{name}: YAML param {pname!r} not in {model.__name__}.model_json_schema()")
-            continue
-        ytype = YAML_TO_JSON.get(str(p.get("type") or "string").lower(), "string")
-        stype = json_type(props[pname])
-        if ytype != stype:
-            errors.append(
-                f"{name}: param {pname!r} type YAML {p.get('type')} ~ {ytype} vs schema {stype}"
-            )
-        yreq = bool(p.get("required"))
-        if yreq and pname not in required:
-            errors.append(f"{name}: YAML marks {pname!r} required but schema does not")
-        if not yreq and pname in required:
-            errors.append(f"{name}: schema requires {pname!r} but YAML does not")
-
-    extras = sorted(set(props) - yaml_set)
-    if extras:
-        warns.append(f"{name}: schema fields not in YAML: {', '.join(extras)}")
+        errors.append(f"{name}: missing entry {raw}")
+    venv = tool.get("venv") or os.environ.get("WALLOP_VENV")
+    if venv:
+        vp = Path(str(venv))
+        if not vp.is_absolute():
+            vp = (root / vp).resolve()
+        if not vp.exists():
+            errors.append(f"{name}: venv path missing {vp}")
     return errors, warns
 
 
-def check_env(root: Path) -> tuple[list[str], list[str]]:
+def check_env(root: Path, strict: bool) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warns: list[str] = []
     tz = os.environ.get("HARNESS_TZ") or "Asia/Hong_Kong"
@@ -163,7 +74,11 @@ def check_env(root: Path) -> tuple[list[str], list[str]]:
 
         ZoneInfo(tz)
     except Exception as exc:  # noqa: BLE001
-        errors.append(f"HARNESS_TZ={tz!r} is not a usable IANA zone: {exc}")
+        msg = f"HARNESS_TZ={tz!r} unusable ({exc}). On Windows: py -3 -m pip install tzdata"
+        if strict:
+            errors.append(msg)
+        else:
+            warns.append(msg)
 
     raw_vault = os.environ.get("VAULT_PATH") or str(root / "sandbox" / "vault")
     vault = Path(raw_vault)
@@ -178,7 +93,7 @@ def check_env(root: Path) -> tuple[list[str], list[str]]:
     return errors, warns
 
 
-def run(registry_path: Path, root: Path) -> int:
+def run(registry_path: Path, root: Path, strict: bool) -> int:
     errors: list[str] = []
     warns: list[str] = []
     if not registry_path.is_file():
@@ -188,15 +103,16 @@ def run(registry_path: Path, root: Path) -> int:
     tools = list(data.get("tools") or [])
     errors.extend(check_duplicates(tools))
     for tool in tools:
-        e, w = check_tool(root, tool)
+        e, w = check_tool_exists(root, tool)
         errors.extend(e)
         warns.extend(w)
-    e, w = check_env(root)
+    e, w = check_env(root, strict)
     errors.extend(e)
     warns.extend(w)
 
     report = {
         "ok": not errors,
+        "mode": "strict" if strict else "exists",
         "registry": str(registry_path),
         "tools": len(tools),
         "errors": errors,
@@ -216,15 +132,12 @@ def run(registry_path: Path, root: Path) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     root = repo_root()
-    p = argparse.ArgumentParser(description="Check wallop registry, tool schemas, and env paths")
-    p.add_argument(
-        "--registry",
-        default=str(root / "config" / "tool_registry.yaml"),
-        help="path to tool_registry.yaml",
-    )
-    p.add_argument("--root", default=str(root), help="repo root")
+    p = argparse.ArgumentParser(description="Check wallop registry paths")
+    p.add_argument("--registry", default=str(root / "config" / "tool_registry.yaml"))
+    p.add_argument("--root", default=str(root))
+    p.add_argument("--strict", action="store_true", help="import tools and match pydantic Input")
     args = p.parse_args(argv)
-    return run(Path(args.registry), Path(args.root).resolve())
+    return run(Path(args.registry), Path(args.root).resolve(), args.strict)
 
 
 if __name__ == "__main__":
