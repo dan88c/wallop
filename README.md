@@ -1,9 +1,13 @@
 # Wallop
 
+[![Status: Work in Progress](https://img.shields.io/badge/status-work_in_progress-orange.svg)](https://github.com/your-username/your-repo)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![GitHub release](https://img.shields.io/github/v/release/dan88c/wallop?include_prereleases&color=brightgreen)](https://github.com/dan88c/wallop/releases)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Go 1.22+](https://img.shields.io/badge/go-1.22+-00ADD8.svg)](https://go.dev/)
+
+> [!NOTE]
+> **Work in Progress**: This project is actively under heavy development. APIs, architecture, and features are subject to breaking changes without notice. Use in production at your own risk.
 
 A privacy-first, token-lean toolbox and execution harness for local small LLMs.
 
