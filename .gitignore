@@ -17,3 +17,4 @@ dist/wallop-*
 !dist/README.md
 
 logs/
+draft/
