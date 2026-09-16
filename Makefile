@@ -25,8 +25,8 @@ download:
 
 build:
 	mkdir -p bin $(GO_DIR)/bin
-	cd $(GO_DIR) && go build -o ../bin/wallop ./cmd/harness
-	cd $(GO_DIR) && go build -o bin/harness ./cmd/harness
+	cd $(GO_DIR) && go build -o ../bin/wallop ./cmd/wallop
+	cd $(GO_DIR) && go build -o bin/wallop ./cmd/wallop
 
 install: build
 	mkdir -p $(PREFIX)/bin

@@ -15,9 +15,8 @@ if errorlevel 1 (
   exit /b 2
 )
 mkdir "%ROOT%bin" 2>nul
-go build -o "%ROOT%bin\wallop.exe" ./cmd/harness
-if errorlevel 1 exit /b 1
 cd /d "%ROOT%core-operator"
-go build -o "%ROOT%bin\wallop.exe" ./cmd/harness
+go build -o "%ROOT%bin\wallop.exe" ./cmd/wallop
+if errorlevel 1 exit /b 1
 cd /d "%ROOT%"
 "%ROOT%bin\wallop.exe" %*

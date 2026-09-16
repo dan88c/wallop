@@ -12,15 +12,14 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.event.head_commit.message != '' && !contains(github.event.head_commit.message, '[skip ci]')
+    if: github.event_name == 'workflow_dispatch' || (github.event.head_commit.message != '' && !contains(github.event.head_commit.message, '[skip ci]'))
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
+          cache-dependency-path: core-operator/go.sum
 
       - name: Cross-compile wallop
         working-directory: core-operator
@@ -28,9 +27,10 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           mkdir -p ../dist
-          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/wallop-windows-amd64.exe ./cmd/harness
-          GOOS=darwin  GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o ../dist/wallop-darwin-arm64 ./cmd/harness
-          GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ../dist/wallop-linux-amd64 ./cmd/harness
+          ldflags='-s -w'
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="$ldflags" -o ../dist/wallop-windows-amd64.exe ./cmd/wallop
+          GOOS=darwin  GOARCH=arm64 go build -trimpath -ldflags="$ldflags" -o ../dist/wallop-darwin-arm64 ./cmd/wallop
+          GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags="$ldflags" -o ../dist/wallop-linux-amd64 ./cmd/wallop
           ls -la ../dist
 
       - name: Upload build artifacts
