@@ -4,13 +4,13 @@ description: Local wallop tool governor. Load when the user names wallop, toc, g
 license: MIT
 metadata:
   version: "1.13"
-  release: "1.2.000"
+  release: "2.0.000"
   repo: dan88c/wallop
 ---
 
 # wallop operator skill
 
-Project release **1.2.000** (`VERSION`). Skill protocol **1.13**.
+Project release **2.0.000** (`VERSION`). Skill protocol **1.13**.
 
 Working directory = repo root. Set `WALLOP_ROOT` if needed. If `wallop` is not on PATH, use `./bin/wallop` or `.\\bin\\wallop.exe`.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Developer factory: gap request -> Python tool -> tests -> registry backfill."""
+"""Developer factory: gap request -> Python tool -> tests."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import yaml
 from jinja2 import Environment, FileSystemLoader
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -71,42 +70,6 @@ def render_tool(name: str, desc: str, params: list[dict]) -> str:
     return tmpl.render(class_name=class_name(name), desc=desc, params=params)
 
 
-def upsert_registry(
-    name: str,
-    desc: str,
-    tags: list[str],
-    entry: str,
-    params: list[dict],
-    risk: str,
-    *,
-    registry: Path,
-) -> None:
-    data = yaml.safe_load(registry.read_text(encoding="utf-8")) or {}
-    tools = data.setdefault("tools", [])
-    payload = {
-        "name": name,
-        "desc": desc,
-        "tags": tags,
-        "entry": entry,
-        "risk": risk,
-        "params": [
-            {
-                "name": p["name"],
-                "type": p["type"],
-                "required": p["required"],
-            }
-            for p in params
-        ],
-    }
-    for i, existing in enumerate(tools):
-        if existing.get("name") == name:
-            tools[i] = payload
-            break
-    else:
-        tools.append(payload)
-    registry.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
-
-
 def write_smoke_test(name: str, *, root: Path) -> Path:
     test_dir = root / "tests" / "python_tests"
     test_dir.mkdir(parents=True, exist_ok=True)
@@ -126,7 +89,7 @@ def test_import_and_schema():
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Generate a tool, test it, backfill YAML TOC")
+    p = argparse.ArgumentParser(description="Generate a tool, then run its tests")
     p.add_argument("--name", default="", help="tool name (optional with --brief)")
     p.add_argument("--desc", default="", help="tool description (optional with --brief)")
     p.add_argument("--brief", default="", help="free-text request; sanitized then proposed")
@@ -138,7 +101,6 @@ def main(argv: list[str] | None = None) -> int:
 
     root = repo_root()
     tools_dir = root / "tools"
-    registry = root / "config" / "tool_registry.yaml"
 
     desc = args.desc
     name = args.name
@@ -173,19 +135,10 @@ def main(argv: list[str] | None = None) -> int:
             cwd=root,
         )
         if proc.returncode != 0:
-            print("factory: tests failed; registry not updated", file=sys.stderr)
+            print("factory: tests failed; tool not kept as registered", file=sys.stderr)
             return proc.returncode
 
-    upsert_registry(
-        name,
-        desc,
-        args.tag or ["generated"],
-        f"tools/{name}.py",
-        params,
-        args.risk,
-        registry=registry,
-    )
-    print(f"factory: wrote {dest.relative_to(root)} and updated {registry.relative_to(root)}")
+    print(f"factory: wrote {dest.relative_to(root)}")
     return 0
 
 
