@@ -131,11 +131,10 @@ def ensure_binary(*, force_download: bool) -> tuple[str, str]:
         out_go = ROOT / "core-operator" / "bin"
         out_root.mkdir(parents=True, exist_ok=True)
         out_go.mkdir(parents=True, exist_ok=True)
-        code = run([go, "build", "-o", str(out_root / name), "./cmd/harness"], cwd=ROOT / "core-operator", check=False)
+        code = run([go, "build", "-o", str(out_root / name), "./cmd/wallop"], cwd=ROOT / "core-operator", check=False)
         if code != 0:
             raise SystemExit(code)
-        legacy = "harness.exe" if os.name == "nt" else "harness"
-        run([go, "build", "-o", str(out_go / legacy), "./cmd/harness"], cwd=ROOT / "core-operator", check=False)
+        run([go, "build", "-o", str(out_go / name), "./cmd/wallop"], cwd=ROOT / "core-operator", check=False)
         return "go build", f"bin/{name}"
 
     if not asset:
@@ -236,6 +235,8 @@ def main(argv: list[str] | None = None) -> int:
         code = test_go()
         if code != 0:
             return code
+        if args.test and not do_all:
+            return 0
     if do_all or args.demo:
         code = demo(py)
         if code != 0:
